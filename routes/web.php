@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', function () {
-    return view('dashboard.dashboard-one');
+    return view('dashboard.dashboard-four');
 });
 // Route::view('/', 'starter')->name('starter');
 Route::get('large-compact-sidebar/dash/dashboard1', function () {
@@ -165,6 +165,12 @@ Route::view('others/search-result', 'others.search-result')->name('search-result
 // Auth::routes();
 
 Route::get('/home', 'HomeController@index')->name('home');
-Route::view('verify/index', 'forms.verify')->name('verify');
+
+// Verification routes
+Route::get('verify/index', 'App\Http\Controllers\VerificationController@index')->name('verify');
+Route::post('verify', 'App\Http\Controllers\VerificationController@verify')->name('verification.verify');
+Route::post('verify/batch', 'App\Http\Controllers\VerificationController@verifyBatch')->name('verification.batch');
+Route::get('verify/export', 'App\Http\Controllers\VerificationController@export')->name('verification.export');
+Route::get('verify/results', 'App\Http\Controllers\VerificationController@results')->name('verification.results');
 
 

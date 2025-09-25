@@ -16,6 +16,15 @@
     </div>
 
     <div class="separator-breadcrumb border-top"></div>
+
+    <!-- Alert Messages Container -->
+    <div id="alert-container" class="mb-4" style="display: none;">
+        <div class="alert" role="alert" id="alert-message">
+            <strong id="alert-title"></strong> <span id="alert-text"></span>
+            <button type="button" class="btn-close" onclick="hideAlert()" aria-label="Close"></button>
+        </div>
+    </div>
+
     <div class="col-md-3">
         <div class="card mb-4">
             <div class="card-body">
@@ -37,7 +46,7 @@
 
                 <div class="card-body">
                     <h4 class="card-title mb-3">Phone Number Table</h4>
-                    <button id="download-csv-btn" class="btn btn-secondary mb-3">Download as CSV</button>
+                    <a href="{{ route('verification.export') }}" class="btn btn-secondary mb-3">Export to Excel</a>
                     <div class="table-responsive">
                         <table id="deafult_ordering_table" class="display table table-striped table-bordered"
                             style="width:100%">
@@ -51,166 +60,32 @@
                                     <th>Status</th>
                                     <th>Type</th>
                                     <th>Ported</th>
-                                    <th>Ported Date</th>
-                                    <th>Roaming</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @php
-                                    $phoneData = [
-                                        '40721987086' => [
-                                            'current_network' => [
-                                                'lrn' => null,
-                                                'mcc' => 226,
-                                                'mnc' => 10,
-                                                'name' => 'Orange Romania',
-                                                'spid' => 4018740,
-                                            ],
-                                            'is_roaming' => false,
-                                            'number' => 40721987086,
-                                            'origin_network' => [
-                                                'mcc' => 226,
-                                                'mnc' => 1,
-                                                'name' => 'Vodafone Romania',
-                                                'spid' => 4018720,
-                                            ],
-                                            'ported' => true,
-                                            'ported_date' => '2016-12-30 15:15:19',
-                                            'ported_date_type' => 'exact',
-                                            'present' => 'yes',
-                                            'status' => 0,
-                                            'status_message' => 'Success',
-                                            'type' => 'mobile',
-                                            'etype' => 10,
-                                        ],
-                                        '40723456789' => [
-                                            'current_network' => [
-                                                'lrn' => null,
-                                                'mcc' => 226,
-                                                'mnc' => 1,
-                                                'name' => 'Vodafone Romania',
-                                                'spid' => 4018720,
-                                            ],
-                                            'is_roaming' => false,
-                                            'number' => 40723456789,
-                                            'origin_network' => [
-                                                'mcc' => 226,
-                                                'mnc' => 1,
-                                                'name' => 'Vodafone Romania',
-                                                'spid' => 4018720,
-                                            ],
-                                            'ported' => false,
-                                            'ported_date' => null,
-                                            'ported_date_type' => null,
-                                            'present' => 'yes',
-                                            'status' => 0,
-                                            'status_message' => 'Success',
-                                            'type' => 'mobile',
-                                            'etype' => 10,
-                                        ],
-                                        '40731234567' => [
-                                            'current_network' => [
-                                                'lrn' => null,
-                                                'mcc' => 226,
-                                                'mnc' => 3,
-                                                'name' => 'Telekom Romania',
-                                                'spid' => 4018730,
-                                            ],
-                                            'is_roaming' => true,
-                                            'number' => 40731234567,
-                                            'origin_network' => [
-                                                'mcc' => 226,
-                                                'mnc' => 10,
-                                                'name' => 'Orange Romania',
-                                                'spid' => 4018740,
-                                            ],
-                                            'ported' => true,
-                                            'ported_date' => '2019-05-14 09:30:45',
-                                            'ported_date_type' => 'exact',
-                                            'present' => 'yes',
-                                            'status' => 0,
-                                            'status_message' => 'Success',
-                                            'type' => 'mobile',
-                                            'etype' => 10,
-                                        ],
-                                        '40745678901' => [
-                                            'current_network' => [
-                                                'lrn' => null,
-                                                'mcc' => 226,
-                                                'mnc' => 15,
-                                                'name' => 'Digi Romania',
-                                                'spid' => 4018750,
-                                            ],
-                                            'is_roaming' => false,
-                                            'number' => 40745678901,
-                                            'origin_network' => [
-                                                'mcc' => 226,
-                                                'mnc' => 15,
-                                                'name' => 'Digi Romania',
-                                                'spid' => 4018750,
-                                            ],
-                                            'ported' => false,
-                                            'ported_date' => null,
-                                            'ported_date_type' => null,
-                                            'present' => 'yes',
-                                            'status' => 0,
-                                            'status_message' => 'Success',
-                                            'type' => 'mobile',
-                                            'etype' => 10,
-                                        ],
-                                        '40756789012' => [
-                                            'current_network' => [
-                                                'lrn' => null,
-                                                'mcc' => 226,
-                                                'mnc' => 10,
-                                                'name' => 'Orange Romania',
-                                                'spid' => 4018740,
-                                            ],
-                                            'is_roaming' => false,
-                                            'number' => 40756789012,
-                                            'origin_network' => [
-                                                'mcc' => 226,
-                                                'mnc' => 3,
-                                                'name' => 'Telekom Romania',
-                                                'spid' => 4018730,
-                                            ],
-                                            'ported' => true,
-                                            'ported_date' => '2021-11-08 14:22:33',
-                                            'ported_date_type' => 'exact',
-                                            'present' => 'yes',
-                                            'status' => 0,
-                                            'status_message' => 'Success',
-                                            'type' => 'mobile',
-                                            'etype' => 10,
-                                        ],
-                                    ];
-                                @endphp
-
-                                @foreach ($phoneData as $phoneNumber => $data)
+                                @forelse ($verificationResults as $result)
                                     <tr>
-                                        <td>{{ $phoneNumber }}</td>
-                                        <td>{{ $data['current_network']['name'] }}</td>
-                                        <td>{{ $data['origin_network']['name'] }}</td>
+                                        <td>{{ $result->phone_number }}</td>
+                                        <td>{{ $result->current_network_name ?? 'Unknown' }}</td>
+                                        <td>{{ $result->origin_network_name ?? 'Unknown' }}</td>
                                         <td>
                                             <span
-                                                class="badge badge-pill badge-outline-{{ $data['status'] == 0 ? 'success' : 'danger' }} p-2 m-1">{{ $data['status_message'] }}</span>
+                                                class="badge badge-pill badge-outline-{{ $result->status == 0 ? 'success' : 'danger' }} p-2 m-1">{{ $result->status_message }}</span>
                                         </td>
-                                        <td>{{ ucfirst($data['type']) }}</td>
+                                        <td>{{ ucfirst($result->type ?? 'unknown') }}</td>
                                         <td>
                                             <span
-                                                class="badge badge-pill badge-outline-{{ $data['ported'] ? 'success' : 'danger' }} p-2 m-1">
-                                                {{ $data['ported'] ? 'Yes' : 'No' }}
+                                                class="badge badge-pill badge-outline-{{ $result->ported ? 'success' : 'danger' }} p-2 m-1">
+                                                {{ $result->ported ? 'Yes' : 'No' }}
                                             </span>
                                         </td>
-                                        <td>{{ $data['ported_date'] ?? 'N/A' }}</td>
-                                        <td>
-                                            <span
-                                                class="badge badge-pill badge-outline-{{ $data['is_roaming'] ? 'success' : 'danger' }} p-2 m-1">
-                                                {{ $data['is_roaming'] ? 'Yes' : 'No' }}
-                                            </span>
-                                        </td>
+
                                     </tr>
-                                @endforeach
+                                @empty
+                                    <tr>
+                                        <td colspan="8" class="text-center">No verification results found!</td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
@@ -227,15 +102,22 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="verifyLabel">Modal title</h5>
+                    <h5 class="modal-title" id="verifyLabel">Verify Phone Number</h5>
                 </div>
                 <div class="modal-body">
-                    <label for="number" class="col-form-label">Enter Phone Number</label>
-                    <input type="phone" class="form-control" id="number">
+                    <form id="verifyForm">
+                        @csrf
+                        <label for="phone_number" class="col-form-label">Enter Phone Number</label>
+                        <input type="tel" class="form-control" id="phone_number" name="phone_number" required>
+                        <div class="invalid-feedback" id="phone-error"></div>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary">Verify</button>
+                    <button type="button" class="btn btn-primary" id="verifyBtn">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        Verify
+                    </button>
                 </div>
             </div>
         </div>
@@ -245,18 +127,34 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="uploadLabel">Upload CVS Files</h5>
+                    <h5 class="modal-title" id="uploadLabel">Batch Verification</h5>
                 </div>
                 <div class="modal-body">
-                    <form action="#" class="dropzone" id="single-file-upload">
-                        <div class="fallback">
-                            <input name="file" type="file" />
+                    <div class="mb-3">
+                        <label for="file-upload" class="form-label">Upload Excel File</label>
+                        <input type="file" class="form-control" id="file-upload" accept=".xlsx,.xls,.csv" required>
+                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the first column</div>
+                        <div class="invalid-feedback" id="batch-error"></div>
+                    </div>
+                    <div class="mb-3" id="file-preview" style="display: none;">
+                        <h6>File Preview:</h6>
+                        <div class="alert alert-info" id="preview-info"></div>
+                        <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr><th>Phone Numbers Found</th></tr>
+                                </thead>
+                                <tbody id="preview-body"></tbody>
+                            </table>
                         </div>
-                    </form>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary">Verify</button>
+                    <button type="button" class="btn btn-primary" id="batchVerifyBtn">
+                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        Verify All
+                    </button>
                 </div>
             </div>
         </div>
@@ -275,61 +173,289 @@
     <script src="{{ asset('assets/js/datatables.script.js') }}"></script>
     <script src="{{ asset('assets/js/vendor/dropzone.min.js') }}"></script>
     <script src="{{ asset('assets/js/dropzone.script.js') }}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
+        // Alert Functions
+        function showAlert(type, title, message) {
+            const alertContainer = document.getElementById('alert-container');
+            const alertMessage = document.getElementById('alert-message');
+            const alertTitle = document.getElementById('alert-title');
+            const alertText = document.getElementById('alert-text');
+
+            // Remove existing alert classes
+            alertMessage.className = 'alert';
+
+            // Add new alert type class
+            alertMessage.classList.add('alert-' + type);
+
+            alertTitle.textContent = title + '!';
+            alertText.textContent = message;
+
+            alertContainer.style.display = 'block';
+
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    hideAlert();
+                }, 5000);
+            }
+        }
+
+        function hideAlert() {
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.style.display = 'none';
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('download-csv-btn').addEventListener('click', function() {
-                const table = document.getElementById('deafult_ordering_table');
-                let csv = [];
+            const verifyBtn = document.getElementById('verifyBtn');
+            const phoneInput = document.getElementById('phone_number');
+            const phoneError = document.getElementById('phone-error');
+            const spinner = verifyBtn.querySelector('.spinner-border');
+            const modal = document.getElementById('verify');
 
-                // Get table headers
-                const headers = Array.from(table.querySelectorAll('thead th')).map(th => {
-                    return th.innerText.trim().replace(/\s+/g, ' ');
+            verifyBtn.addEventListener('click', function() {
+                const phoneNumber = phoneInput.value.trim();
+
+                if (!phoneNumber) {
+                    phoneInput.classList.add('is-invalid');
+                    phoneError.textContent = 'Please enter a phone number';
+                    return;
+                }
+
+                // Remove previous error state
+                phoneInput.classList.remove('is-invalid');
+                phoneError.textContent = '';
+
+                // Show loading state
+                verifyBtn.disabled = true;
+                spinner.classList.remove('d-none');
+                verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
+
+                // Make API call
+                fetch('{{ route("verification.verify") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        phone_number: phoneNumber
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        $(modal).modal('hide');
+                        showAlert('success', 'Success', 'Phone number verified successfully!');
+                        setTimeout(() => {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        phoneInput.classList.add('is-invalid');
+                        phoneError.textContent = data.error || 'Verification failed';
+                        showAlert('warning', 'Warning', data.error || 'Phone number verification failed.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    phoneInput.classList.add('is-invalid');
+                    phoneError.textContent = 'Network error. Please try again.';
+                    showAlert('danger', 'Error', 'Network error occurred. Please try again.');
+                })
+                .finally(() => {
+                    verifyBtn.disabled = false;
+                    spinner.classList.add('d-none');
+                    verifyBtn.innerHTML = 'Verify';
                 });
-                csv.push(headers.join(','));
+            });
 
-                // Get all table rows from tbody
-                const rows = table.querySelectorAll('tbody tr');
-                rows.forEach(row => {
-                    const rowData = [];
-                    const cells = row.querySelectorAll('td');
+            $(modal).on('hidden.bs.modal', function() {
+                phoneInput.value = '';
+                phoneInput.classList.remove('is-invalid');
+                phoneError.textContent = '';
+                verifyBtn.disabled = false;
+                spinner.classList.add('d-none');
+                verifyBtn.innerHTML = 'Verify';
+            });
 
-                    cells.forEach(cell => {
-                        let cellText = '';
-                        // Check if cell contains a span (badge) and get its text
-                        const span = cell.querySelector('span');
-                        if (span) {
-                            cellText = span.innerText.trim();
+            phoneInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    verifyBtn.click();
+                }
+            });
+
+            const batchVerifyBtn = document.getElementById('batchVerifyBtn');
+            const fileUpload = document.getElementById('file-upload');
+            const batchError = document.getElementById('batch-error');
+            const batchModal = document.getElementById('upload');
+            const filePreview = document.getElementById('file-preview');
+            const previewInfo = document.getElementById('preview-info');
+            const previewBody = document.getElementById('preview-body');
+            let extractedPhoneNumbers = [];
+
+            fileUpload.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        if (file.name.endsWith('.csv')) {
+                            extractedPhoneNumbers = parseCSV(event.target.result);
                         } else {
-                            cellText = cell.innerText.trim();
+                            extractedPhoneNumbers = parseExcel(event.target.result);
                         }
 
-                        // Escape quotes and wrap in quotes if necessary
-                        cellText = cellText.replace(/"/g, '""');
-                        if (cellText.includes(',') || cellText.includes('\n') || cellText.includes('"')) {
-                            cellText = `"${cellText}"`;
+                        showPreview(extractedPhoneNumbers);
+                    } catch (error) {
+                        fileUpload.classList.add('is-invalid');
+                        batchError.textContent = 'Error reading file: ' + error.message;
+                    }
+                };
+
+                if (file.name.endsWith('.csv')) {
+                    reader.readAsText(file);
+                } else {
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+
+            function parseCSV(csvText) {
+                const lines = csvText.split('\n');
+                const phoneNumbers = [];
+
+                for (let line of lines) {
+                    const columns = line.split(',');
+                    if (columns[0] && columns[0].trim()) {
+                        const phone = columns[0].trim().replace(/[^\d+]/g, '');
+                        if (phone && phone.length >= 8) {
+                            phoneNumbers.push(phone);
                         }
-                        rowData.push(cellText);
-                    });
+                    }
+                }
+                return phoneNumbers;
+            }
 
-                    csv.push(rowData.join(','));
+            function parseExcel(arrayBuffer) {
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                const phoneNumbers = [];
+
+                for (let row of jsonData) {
+                    if (row[0]) {
+                        const phone = String(row[0]).trim().replace(/[^\d+]/g, '');
+                        if (phone && phone.length >= 8) {
+                            phoneNumbers.push(phone);
+                        }
+                    }
+                }
+
+                return phoneNumbers;
+            }
+
+            function showPreview(phoneNumbers) {
+                if (phoneNumbers.length === 0) {
+                    fileUpload.classList.add('is-invalid');
+                    batchError.textContent = 'No valid phone numbers found in file';
+                    filePreview.style.display = 'none';
+                    return;
+                }
+
+                fileUpload.classList.remove('is-invalid');
+                batchError.textContent = '';
+
+                previewInfo.textContent = `Found ${phoneNumbers.length} phone numbers`;
+                previewBody.innerHTML = '';
+
+                phoneNumbers.slice(0, 10).forEach(phone => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td>${phone}</td>`;
+                    previewBody.appendChild(row);
                 });
 
-                // Create Excel-compatible CSV content with BOM for UTF-8
-                const BOM = '\uFEFF';
-                const csvContent = BOM + csv.join('\r\n');
+                if (phoneNumbers.length > 10) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td><em>... and ${phoneNumbers.length - 10} more</em></td>`;
+                    previewBody.appendChild(row);
+                }
 
-                // Create a Blob and trigger the download
-                const csvFile = new Blob([csvContent], {
-                    type: 'text/csv;charset=utf-8;'
+                filePreview.style.display = 'block';
+            }
+
+            batchVerifyBtn.addEventListener('click', function() {
+                if (extractedPhoneNumbers.length === 0) {
+                    fileUpload.classList.add('is-invalid');
+                    batchError.textContent = 'Please upload a file with phone numbers';
+                    return;
+                }
+
+                // Remove previous error state
+                fileUpload.classList.remove('is-invalid');
+                batchError.textContent = '';
+
+                // Show loading state
+                batchVerifyBtn.disabled = true;
+                const batchSpinner = batchVerifyBtn.querySelector('.spinner-border');
+                batchSpinner.classList.remove('d-none');
+                batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
+
+                // Make batch API call
+                fetch('{{ route("verification.batch") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        phone_numbers: extractedPhoneNumbers
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Success - close modal, show success alert and reload page
+                        $(batchModal).modal('hide');
+                        showAlert('success', 'Success', `Processed ${data.processed} numbers, saved ${data.saved} results.`);
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        // Show error
+                        fileUpload.classList.add('is-invalid');
+                        batchError.textContent = data.error || 'Batch verification failed';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    fileUpload.classList.add('is-invalid');
+                    batchError.textContent = 'Network error. Please try again.';
+                    showAlert('danger', 'Error', 'Network error occurred during batch verification. Please try again.');
+                })
+                .finally(() => {
+                    // Reset button state
+                    batchVerifyBtn.disabled = false;
+                    batchSpinner.classList.add('d-none');
+                    batchVerifyBtn.innerHTML = 'Verify All';
                 });
-                const downloadLink = document.createElement('a');
-                downloadLink.href = URL.createObjectURL(csvFile);
-                downloadLink.setAttribute('download', 'phone_number_data.csv');
-                downloadLink.style.display = 'none';
-                document.body.appendChild(downloadLink);
-                downloadLink.click();
-                document.body.removeChild(downloadLink);
+            });
+
+            // Reset batch form when modal is hidden
+            $(batchModal).on('hidden.bs.modal', function() {
+                fileUpload.value = '';
+                fileUpload.classList.remove('is-invalid');
+                batchError.textContent = '';
+                filePreview.style.display = 'none';
+                extractedPhoneNumbers = [];
+                batchVerifyBtn.disabled = false;
+                const batchSpinner = batchVerifyBtn.querySelector('.spinner-border');
+                batchSpinner.classList.add('d-none');
+                batchVerifyBtn.innerHTML = 'Verify All';
             });
         });
     </script>

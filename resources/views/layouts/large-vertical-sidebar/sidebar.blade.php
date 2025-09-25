@@ -2,7 +2,7 @@
     <div class="sidebar-left open rtl-ps-none" data-perfect-scrollbar data-suppress-scroll-x="true">
         <ul class="navigation-left">
             <li class="nav-item {{ request()->is('dashboard/*') ? 'active' : '' }}">
-                <a class="nav-item-hold" href="{{ route('dashboard_version_1') }}">
+                <a class="nav-item-hold" href="{{ route('dashboard_version_4') }}">
                     <i class="nav-icon i-Bar-Chart"></i>
                     <span class="nav-text">Dashboard</span>
                 </a>

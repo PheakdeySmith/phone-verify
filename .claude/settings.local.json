@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(php artisan make:migration:*)",
+      "Bash(composer:*)",
+      "Bash(/home/smith/.config/herd-lite/bin/composer require maatwebsite/excel)"
     ],
     "deny": [],
     "ask": []

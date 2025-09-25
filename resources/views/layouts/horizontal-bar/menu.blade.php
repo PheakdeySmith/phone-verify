@@ -6,7 +6,7 @@
                     <li class="{{ request()->is('dashboard/*') ? 'active' : '' }}">
                         <div>
                             <div>
-                                <a href="{{ route('dashboard_version_1') }}">
+                                <a href="{{ route('dashboard_version_4') }}">
                                     <i class="nav-icon me-2 i-Bar-Chart"></i>
                                     Dashboard
                                 </a>
