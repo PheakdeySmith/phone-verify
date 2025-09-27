@@ -17,7 +17,7 @@ $(document).ready(function () {
 
     $('#deafult_ordering_table').DataTable({
         "order": [
-            [3, "desc"]
+            [8, "desc"] // Order by "Verified" column (last column) descending to show newest first
         ]
     });
 

@@ -1,10 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find:*)",
-      "Bash(php artisan make:migration:*)",
-      "Bash(composer:*)",
-      "Bash(/home/smith/.config/herd-lite/bin/composer require maatwebsite/excel)"
+      "Bash(php artisan tinker:*)",
+      "Read(//mnt/c/Users/pheak/OneDrive/Pictures/Screenshots/**)"
     ],
     "deny": [],
     "ask": []

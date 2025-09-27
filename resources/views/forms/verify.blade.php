@@ -54,36 +54,60 @@
 
                             <thead>
                                 <tr>
-                                    <th>Phone Number</th>
-                                    <th>Current Network</th>
-                                    <th>Origin Network</th>
-                                    <th>Status</th>
+                                    <th>Number</th>
+                                    <th>Network</th>
+                                    <th>MCC/MNC</th>
                                     <th>Type</th>
+                                    <th>Status</th>
                                     <th>Ported</th>
+                                    <th>Present</th>
+                                    <th>Transaction ID</th>
+                                    <th>Verified</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($verificationResults as $result)
-                                    <tr>
-                                        <td>{{ $result->phone_number }}</td>
-                                        <td>{{ $result->current_network_name ?? 'Unknown' }}</td>
-                                        <td>{{ $result->origin_network_name ?? 'Unknown' }}</td>
+                                @forelse ($verifications as $verification)
+                                    <tr data-phone="{{ $verification->number }}">
+                                        <td>{{ $verification->number }}</td>
+                                        <td>{{ $verification->network ?? 'Unknown' }}</td>
+                                        <td>{{ $verification->mcc }}/{{ $verification->mnc }}</td>
+                                        <td>{{ ucfirst($verification->type ?? 'unknown') }}</td>
                                         <td>
                                             <span
-                                                class="badge badge-pill badge-outline-{{ $result->status == 0 ? 'success' : 'danger' }} p-2 m-1">{{ $result->status_message }}</span>
-                                        </td>
-                                        <td>{{ ucfirst($result->type ?? 'unknown') }}</td>
-                                        <td>
-                                            <span
-                                                class="badge badge-pill badge-outline-{{ $result->ported ? 'success' : 'danger' }} p-2 m-1">
-                                                {{ $result->ported ? 'Yes' : 'No' }}
+                                                class="badge badge-pill badge-outline-{{ $verification->isSuccessful() ? 'success' : 'danger' }} p-2 m-1">
+                                                {{ $verification->status_text }}
                                             </span>
                                         </td>
+                                        <td>
+                                            <span
+                                                class="badge badge-pill badge-outline-{{ $verification->ported ? 'success' : 'secondary' }} p-2 m-1">
+                                                {{ $verification->ported ? 'Yes' : 'No' }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @php
+                                                $presentText = ucfirst($verification->present ?? 'N/A');
+                                                $presentClass = 'secondary'; // Default color (gray) for N/A or other values
 
+                                                if ($verification->present === 'yes') {
+                                                    $presentClass = 'info'; // Blue for 'yes'
+                                                } elseif ($verification->present === 'no') {
+                                                    $presentClass = 'warning'; // Orange for 'no'
+                                                } elseif ($verification->present === 'na') {
+                                                    $presentClass = 'danger'; // Red for 'na' (Not available)
+                                                }
+                                            @endphp
+
+                                            <span class="badge badge-pill badge-outline-{{ $presentClass }} p-2 m-1">
+                                                {{ $presentText }}
+                                            </span>
+                                        </td>
+                                        <td>{{ $verification->trxid ?? 'N/A' }}</td>
+                                        <td>{{ $verification->created_at->format('Y-m-d H:i') }}</td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="text-center">No verification results found!</td>
+                                        <td colspan="9" class="text-center">No verification results found!</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -107,9 +131,23 @@
                 <div class="modal-body">
                     <form id="verifyForm">
                         @csrf
-                        <label for="phone_number" class="col-form-label">Enter Phone Number</label>
-                        <input type="tel" class="form-control" id="phone_number" name="phone_number" required>
-                        <div class="invalid-feedback" id="phone-error"></div>
+                        <div class="mb-3">
+                            <label for="phone_number" class="col-form-label">Enter Phone Number</label>
+                            <input type="tel" class="form-control" id="phone_number" name="phone_number" required>
+                            <div class="invalid-feedback" id="phone-error"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="data_freshness" class="col-form-label">Data Freshness</label>
+                            <select class="form-control" id="data_freshness" name="data_freshness">
+                                <option value="">Use cached data if available (recommended)</option>
+                                <option value="30">Force refresh if data is older than 30 days</option>
+                                <option value="60">Force refresh if data is older than 60 days</option>
+                                <option value="90">Force refresh if data is older than 90 days</option>
+                                <option value="all">Always get fresh data from API</option>
+                            </select>
+                            <div class="form-text">Select when to fetch fresh data from the API vs using cached results
+                            </div>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -133,7 +171,8 @@
                     <div class="mb-3">
                         <label for="file-upload" class="form-label">Upload Excel File</label>
                         <input type="file" class="form-control" id="file-upload" accept=".xlsx,.xls,.csv" required>
-                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the first column</div>
+                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the
+                            first column</div>
                         <div class="invalid-feedback" id="batch-error"></div>
                     </div>
                     <div class="mb-3" id="file-preview" style="display: none;">
@@ -142,11 +181,24 @@
                         <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
                             <table class="table table-sm">
                                 <thead>
-                                    <tr><th>Phone Numbers Found</th></tr>
+                                    <tr>
+                                        <th>Phone Numbers Found</th>
+                                    </tr>
                                 </thead>
                                 <tbody id="preview-body"></tbody>
                             </table>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="batch_data_freshness" class="form-label">Data Freshness</label>
+                        <select class="form-control" id="batch_data_freshness" name="batch_data_freshness">
+                            <option value="">Use cached data if available (recommended)</option>
+                            <option value="30">Force refresh if data is older than 30 days</option>
+                            <option value="60">Force refresh if data is older than 60 days</option>
+                            <option value="90">Force refresh if data is older than 90 days</option>
+                            <option value="all">Always get fresh data from API</option>
+                        </select>
+                        <div class="form-text">Select when to fetch fresh data from the API vs using cached results</div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -190,15 +242,21 @@
             alertMessage.classList.add('alert-' + type);
 
             alertTitle.textContent = title + '!';
-            alertText.textContent = message;
+
+            // Handle multi-line messages by replacing \n with <br>
+            if (message.includes('\n')) {
+                alertText.innerHTML = message.replace(/\n/g, '<br>');
+            } else {
+                alertText.textContent = message;
+            }
 
             alertContainer.style.display = 'block';
 
-            // Auto-hide success messages after 5 seconds
+            // Auto-hide success messages after 8 seconds (increased for cache stats)
             if (type === 'success') {
                 setTimeout(() => {
                     hideAlert();
-                }, 5000);
+                }, 8000);
             }
         }
 
@@ -207,7 +265,132 @@
             alertContainer.style.display = 'none';
         }
 
+        // assets/js/your-script-file.js
+
+        function addOrUpdateVerificationInTable(verificationData) {
+            const table = $('#deafult_ordering_table').DataTable();
+            const phoneNumber = verificationData.phone_number || verificationData.number;
+
+            // --- Prepare the new row's data ---
+            const now = new Date();
+            const formattedDate = now.getFullYear() + '-' +
+                String(now.getMonth() + 1).padStart(2, '0') + '-' +
+                String(now.getDate()).padStart(2, '0') + ' ' +
+                String(now.getHours()).padStart(2, '0') + ':' +
+                String(now.getMinutes()).padStart(2, '0');
+
+            const statusClass = (verificationData.status === 0 && verificationData.error === 0) ? 'success' : 'danger';
+            const statusText = verificationData.status_message || 'Unknown';
+            const portedClass = verificationData.ported ? 'success' : 'secondary';
+            const portedText = verificationData.ported ? 'Yes' : 'No';
+
+            const rowData = [
+                phoneNumber,
+                verificationData.network || 'Unknown',
+                (verificationData.mcc || '') + '/' + (verificationData.mnc || ''),
+                verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) :
+                'Unknown',
+                `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
+                `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
+                `<span class="badge badge-pill badge-outline-info p-2 m-1">${verificationData.present ? verificationData.present.charAt(0).toUpperCase() + verificationData.present.slice(1) : 'N/A'}</span>`,
+                verificationData.trxid || 'N/A',
+                formattedDate
+            ];
+
+            // --- New, more efficient logic to find and update/add the row ---
+            const existingRow = table.row('tr[data-phone="' + phoneNumber + '"]');
+
+            if (existingRow.any()) {
+                // --- Row EXISTS, so UPDATE it ---
+                console.log('Found existing row for phone:', phoneNumber, '. Updating it.');
+                existingRow.data(rowData).draw(false); // Update data and redraw
+
+                const updatedNode = existingRow.node();
+                $(updatedNode).css('background-color', '#fff3cd'); // Yellow highlight for update
+                setTimeout(() => {
+                    $(updatedNode).css('background-color', '');
+                }, 3000);
+
+                console.log('Row updated successfully');
+
+            } else {
+                // --- Row does NOT exist, so ADD it ---
+                console.log('No existing row found. Adding fresh row for phone:', phoneNumber);
+                const newRow = table.row.add(rowData).draw(false); // Add and redraw
+
+                // Set the data-phone attribute on the new <tr> for future lookups
+                const newNode = newRow.node();
+                $(newNode).attr('data-phone', phoneNumber);
+
+                $(newNode).css('background-color', '#e8f5e8'); // Green highlight for new
+                setTimeout(() => {
+                    $(newNode).css('background-color', '');
+                }, 3000);
+
+                console.log('New row added successfully');
+            }
+        }
+
+        // Function to highlight existing row for cached data
+        function highlightExistingRow(phoneNumber) {
+            const table = $('#deafult_ordering_table').DataTable();
+
+            table.rows().every(function(rowIdx, tableLoop, rowLoop) {
+                const data = this.data();
+                if (data && data[0] === phoneNumber) {
+                    const rowNode = this.node();
+
+                    // Add blue highlight for cached data
+                    $(rowNode).css('background-color', '#cce5ff');
+                    setTimeout(() => {
+                        $(rowNode).css('background-color', '');
+                    }, 2000);
+
+                    console.log('Highlighted existing row for cached data:', phoneNumber);
+                    return false; // Break the loop
+                }
+            });
+        }
+
+        // Function to clean up any existing duplicates in the table
+        function cleanupDuplicates() {
+            const table = $('#deafult_ordering_table').DataTable();
+            const phoneNumbers = new Set();
+            const rowsToRemove = [];
+
+            // Find duplicate rows
+            table.rows().every(function(rowIdx, tableLoop, rowLoop) {
+                const data = this.data();
+                if (data && data[0]) {
+                    const phoneNumber = data[0];
+                    if (phoneNumbers.has(phoneNumber)) {
+                        // This is a duplicate, mark for removal
+                        rowsToRemove.push(rowIdx);
+                        console.log('Found duplicate row for phone:', phoneNumber, 'at index:', rowIdx);
+                    } else {
+                        phoneNumbers.add(phoneNumber);
+                    }
+                }
+            });
+
+            // Remove duplicates (in reverse order to maintain correct indices)
+            for (let i = rowsToRemove.length - 1; i >= 0; i--) {
+                table.row(rowsToRemove[i]).remove();
+                console.log('Removed duplicate row at index:', rowsToRemove[i]);
+            }
+
+            if (rowsToRemove.length > 0) {
+                table.draw(false);
+                console.log('Cleaned up', rowsToRemove.length, 'duplicate rows');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Clean up any existing duplicates when page loads
+            setTimeout(() => {
+                cleanupDuplicates();
+            }, 500); // Wait for DataTable to fully initialize
+
             const verifyBtn = document.getElementById('verifyBtn');
             const phoneInput = document.getElementById('phone_number');
             const phoneError = document.getElementById('phone-error');
@@ -216,6 +399,7 @@
 
             verifyBtn.addEventListener('click', function() {
                 const phoneNumber = phoneInput.value.trim();
+                const dataFreshness = document.getElementById('data_freshness').value;
 
                 if (!phoneNumber) {
                     phoneInput.classList.add('is-invalid');
@@ -230,48 +414,63 @@
                 // Show loading state
                 verifyBtn.disabled = true;
                 spinner.classList.remove('d-none');
-                verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
+                verifyBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
                 // Make API call
-                fetch('{{ route("verification.verify") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({
-                        phone_number: phoneNumber
+                fetch('{{ route('verification.verify') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                .getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            phone_number: phoneNumber,
+                            data_freshness: dataFreshness
+                        })
                     })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        $(modal).modal('hide');
-                        showAlert('success', 'Success', 'Phone number verified successfully!');
-                        setTimeout(() => {
-                            location.reload();
-                        }, 1000);
-                    } else {
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            $(modal).modal('hide');
+
+                            // Check if this is cached data
+                            if (data.cached) {
+                                showAlert('info', 'Cached Result',
+                                    'Phone number verification retrieved from cache.');
+                                console.log('Data retrieved from cache, not updating table');
+
+                                // Just highlight the existing row if it exists
+                                highlightExistingRow(data.data.phone_number || data.data.number);
+                            } else {
+                                showAlert('success', 'Success', 'Phone number verified successfully!');
+                                // Only add/update table for fresh API data
+                                addOrUpdateVerificationInTable(data.data);
+                            }
+                        } else {
+                            phoneInput.classList.add('is-invalid');
+                            phoneError.textContent = data.error || 'Verification failed';
+                            showAlert('warning', 'Warning', data.error ||
+                                'Phone number verification failed.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
                         phoneInput.classList.add('is-invalid');
-                        phoneError.textContent = data.error || 'Verification failed';
-                        showAlert('warning', 'Warning', data.error || 'Phone number verification failed.');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = 'Network error. Please try again.';
-                    showAlert('danger', 'Error', 'Network error occurred. Please try again.');
-                })
-                .finally(() => {
-                    verifyBtn.disabled = false;
-                    spinner.classList.add('d-none');
-                    verifyBtn.innerHTML = 'Verify';
-                });
+                        phoneError.textContent = 'Network error. Please try again.';
+                        showAlert('danger', 'Error', 'Network error occurred. Please try again.');
+                    })
+                    .finally(() => {
+                        verifyBtn.disabled = false;
+                        spinner.classList.add('d-none');
+                        verifyBtn.innerHTML = 'Verify';
+                    });
             });
 
             $(modal).on('hidden.bs.modal', function() {
                 phoneInput.value = '';
+                document.getElementById('data_freshness').value = '';
                 phoneInput.classList.remove('is-invalid');
                 phoneError.textContent = '';
                 verifyBtn.disabled = false;
@@ -339,11 +538,15 @@
             }
 
             function parseExcel(arrayBuffer) {
-                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+                const workbook = XLSX.read(arrayBuffer, {
+                    type: 'array'
+                });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
 
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+                    header: 1
+                });
 
                 const phoneNumbers = [];
 
@@ -403,51 +606,72 @@
                 batchVerifyBtn.disabled = true;
                 const batchSpinner = batchVerifyBtn.querySelector('.spinner-border');
                 batchSpinner.classList.remove('d-none');
-                batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
+                batchVerifyBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
                 // Make batch API call
-                fetch('{{ route("verification.batch") }}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                    },
-                    body: JSON.stringify({
-                        phone_numbers: extractedPhoneNumbers
+                fetch('{{ route('verification.batch') }}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                .getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            phone_numbers: extractedPhoneNumbers,
+                            data_freshness: document.getElementById('batch_data_freshness')
+                                .value
+                        })
                     })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Success - close modal, show success alert and reload page
-                        $(batchModal).modal('hide');
-                        showAlert('success', 'Success', `Processed ${data.processed} numbers, saved ${data.saved} results.`);
-                        setTimeout(() => {
-                            location.reload();
-                        }, 2000);
-                    } else {
-                        // Show error
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            // Success - close modal, show success alert and add data to table
+                            $(batchModal).modal('hide');
+
+                            // Create detailed success message with cache statistics
+                            let successMessage =
+                                `Processed ${data.processed} numbers, ${data.saved} successful verifications.`;
+                            if (data.cache_message) {
+                                successMessage += `\n\n${data.cache_message}`;
+                            }
+
+                            showAlert('success', 'Batch Verification Complete', successMessage);
+
+                            // Add or update each verification in the table (only for fresh data)
+                            if (data.data && data.data.length > 0) {
+                                data.data.forEach(verification => {
+                                    // Only update table if this is fresh data (not cached)
+                                    if (verification.source !== 'cache') {
+                                        addOrUpdateVerificationInTable(verification);
+                                    }
+                                });
+                            }
+                        } else {
+                            // Show error
+                            fileUpload.classList.add('is-invalid');
+                            batchError.textContent = data.error || 'Batch verification failed';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
                         fileUpload.classList.add('is-invalid');
-                        batchError.textContent = data.error || 'Batch verification failed';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    fileUpload.classList.add('is-invalid');
-                    batchError.textContent = 'Network error. Please try again.';
-                    showAlert('danger', 'Error', 'Network error occurred during batch verification. Please try again.');
-                })
-                .finally(() => {
-                    // Reset button state
-                    batchVerifyBtn.disabled = false;
-                    batchSpinner.classList.add('d-none');
-                    batchVerifyBtn.innerHTML = 'Verify All';
-                });
+                        batchError.textContent = 'Network error. Please try again.';
+                        showAlert('danger', 'Error',
+                            'Network error occurred during batch verification. Please try again.');
+                    })
+                    .finally(() => {
+                        // Reset button state
+                        batchVerifyBtn.disabled = false;
+                        batchSpinner.classList.add('d-none');
+                        batchVerifyBtn.innerHTML = 'Verify All';
+                    });
             });
 
             // Reset batch form when modal is hidden
             $(batchModal).on('hidden.bs.modal', function() {
                 fileUpload.value = '';
+                document.getElementById('batch_data_freshness').value = '';
                 fileUpload.classList.remove('is-invalid');
                 batchError.textContent = '';
                 filePreview.style.display = 'none';
