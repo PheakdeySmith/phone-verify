@@ -22,7 +22,7 @@ class VerificationController extends Controller
     {
         $request->validate([
         'phone_number' => 'required|string',
-        'data_freshness' => 'nullable|string' // Good practice to validate it
+        'data_freshness' => 'nullable|string' 
     ]);
 
     $phoneNumber = $request->phone_number;
@@ -64,48 +64,50 @@ class VerificationController extends Controller
     }
 
     public function verifyBatch(Request $request)
-    {
-        $request->validate([
-            'phone_numbers' => 'required|array',
-            'phone_numbers.*' => 'required|string'
-        ]);
+{
+    $request->validate([
+        'phone_numbers' => 'required|array',
+        'phone_numbers.*' => 'required|string',
+        'data_freshness' => 'nullable|string|in:30,60,90,all' // Add validation
+    ]);
 
-        $phoneNumbers = $request->phone_numbers;
+    $phoneNumbers = $request->phone_numbers;
+    $dataFreshness = $request->data_freshness; // Get the parameter
 
-        // Use the new batch verification service that returns statistics
-        $batchResult = $this->verificationService->verifyBatch($phoneNumbers);
-        $results = $batchResult['results'];
-        $statistics = $batchResult['statistics'];
+    // Pass the data_freshness parameter to the batch verification
+    $batchResult = $this->verificationService->verifyBatch($phoneNumbers, $dataFreshness);
+    $results = $batchResult['results'];
+    $statistics = $batchResult['statistics'];
 
-        // Separate successful results for saving
-        $savedResults = [];
-        foreach ($results as $result) {
-            if ($result['success']) {
-                $savedResults[] = $result;
-            }
+    // Separate successful results for saving
+    $savedResults = [];
+    foreach ($results as $result) {
+        if ($result['success']) {
+            $savedResults[] = $result;
         }
-
-        // Update batch verification stats
-        $this->incrementStat('verification_stats:batch_total');
-        $this->incrementStatBy('verification_stats:batch_numbers', $statistics['total_numbers']);
-        $this->incrementStatBy('verification_stats:cached_hits', $statistics['cache_hits']);
-        $this->incrementStatBy('verification_stats:database_hits', $statistics['database_hits']);
-        $this->incrementStatBy('verification_stats:api_calls', $statistics['api_calls']);
-
-        return response()->json([
-            'success' => true,
-            'processed' => $statistics['total_numbers'],
-            'saved' => count($savedResults),
-            'statistics' => [
-                'cache_hits' => $statistics['cache_hits'],
-                'database_hits' => $statistics['database_hits'],
-                'api_calls' => $statistics['api_calls'],
-                'total_cached' => $statistics['cache_hits'] + $statistics['database_hits']
-            ],
-            'cache_message' => $this->generateCacheMessage($statistics),
-            'data' => $savedResults
-        ]);
     }
+
+    // Update batch verification stats
+    $this->incrementStat('verification_stats:batch_total');
+    $this->addToStat('verification_stats:batch_numbers', $statistics['total_numbers']);
+    $this->addToStat('verification_stats:cached_hits', $statistics['cache_hits']);
+    $this->addToStat('verification_stats:database_hits', $statistics['database_hits']);
+    $this->addToStat('verification_stats:api_calls', $statistics['api_calls']);
+
+    return response()->json([
+        'success' => true,
+        'processed' => $statistics['total_numbers'],
+        'saved' => count($savedResults),
+        'statistics' => [
+            'cache_hits' => $statistics['cache_hits'],
+            'database_hits' => $statistics['database_hits'],
+            'api_calls' => $statistics['api_calls'],
+            'total_cached' => $statistics['cache_hits'] + $statistics['database_hits']
+        ],
+        'cache_message' => $this->buildCacheMsg($statistics),
+        'data' => $savedResults
+    ]);
+}
 
     public function export()
     {
@@ -152,7 +154,7 @@ class VerificationController extends Controller
         Cache::put($key, $current + 1, now()->addDays(30));
     }
 
-    private function incrementStatBy($key, $value)
+    private function addToStat($key, $value)
     {
         $current = Cache::get($key, 0);
         Cache::put($key, $current + $value, now()->addDays(30));
@@ -163,7 +165,7 @@ class VerificationController extends Controller
         return Cache::get($key, 0);
     }
 
-    private function generateCacheMessage($statistics)
+    private function buildCacheMsg($statistics)
     {
         $total = $statistics['total_numbers'];
         $cacheHits = $statistics['cache_hits'];

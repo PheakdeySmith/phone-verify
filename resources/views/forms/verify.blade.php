@@ -86,15 +86,21 @@
                                         </td>
                                         <td>
                                             @php
-                                                $presentText = ucfirst($verification->present ?? 'N/A');
-                                                $presentClass = 'secondary'; // Default color (gray) for N/A or other values
+                                                // Ensure present value is only yes, no, or na
+                                                $present = strtolower($verification->present ?? 'na');
+                                                if (!in_array($present, ['yes', 'no', 'na'])) {
+                                                    $present = 'na';
+                                                }
 
-                                                if ($verification->present === 'yes') {
-                                                    $presentClass = 'info'; // Blue for 'yes'
-                                                } elseif ($verification->present === 'no') {
-                                                    $presentClass = 'warning'; // Orange for 'no'
-                                                } elseif ($verification->present === 'na') {
-                                                    $presentClass = 'danger'; // Red for 'na' (Not available)
+                                                $presentText = ucfirst($present);
+                                                $presentClass = 'secondary'; // Default color (gray) for na
+
+                                                if ($present === 'yes') {
+                                                    $presentClass = 'success'; // Green for 'yes'
+                                                } elseif ($present === 'no') {
+                                                    $presentClass = 'danger'; // Red for 'no'
+                                                } elseif ($present === 'na') {
+                                                    $presentClass = 'secondary'; // Gray for 'na' (Not available)
                                                 }
                                             @endphp
 
@@ -267,7 +273,7 @@
 
         // assets/js/your-script-file.js
 
-        function addOrUpdateVerificationInTable(verificationData) {
+        function updateTableRow(verificationData) {
             const table = $('#deafult_ordering_table').DataTable();
             const phoneNumber = verificationData.phone_number || verificationData.number;
 
@@ -279,7 +285,7 @@
                 String(now.getHours()).padStart(2, '0') + ':' +
                 String(now.getMinutes()).padStart(2, '0');
 
-            const statusClass = (verificationData.status === 0 && verificationData.error === 0) ? 'success' : 'danger';
+            const statusClass = (verificationData.status === 0) ? 'success' : 'danger';
             const statusText = verificationData.status_message || 'Unknown';
             const portedClass = verificationData.ported ? 'success' : 'secondary';
             const portedText = verificationData.ported ? 'Yes' : 'No';
@@ -292,7 +298,24 @@
                 'Unknown',
                 `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
                 `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
-                `<span class="badge badge-pill badge-outline-info p-2 m-1">${verificationData.present ? verificationData.present.charAt(0).toUpperCase() + verificationData.present.slice(1) : 'N/A'}</span>`,
+                (() => {
+                    // Ensure present value is only yes, no, or na
+                    let present = verificationData.present ? verificationData.present.toLowerCase() : 'na';
+                    if (!['yes', 'no', 'na'].includes(present)) {
+                        present = 'na';
+                    }
+
+                    const presentText = present.charAt(0).toUpperCase() + present.slice(1);
+                    let presentClass = 'secondary'; // Default gray for na
+
+                    if (present === 'yes') {
+                        presentClass = 'success'; // Green for yes
+                    } else if (present === 'no') {
+                        presentClass = 'danger'; // Red for no
+                    }
+
+                    return `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`;
+                })(),
                 verificationData.trxid || 'N/A',
                 formattedDate
             ];
@@ -332,7 +355,7 @@
         }
 
         // Function to highlight existing row for cached data
-        function highlightExistingRow(phoneNumber) {
+        function highlightRow(phoneNumber) {
             const table = $('#deafult_ordering_table').DataTable();
 
             table.rows().every(function(rowIdx, tableLoop, rowLoop) {
@@ -353,7 +376,7 @@
         }
 
         // Function to clean up any existing duplicates in the table
-        function cleanupDuplicates() {
+        function removeDuplicates() {
             const table = $('#deafult_ordering_table').DataTable();
             const phoneNumbers = new Set();
             const rowsToRemove = [];
@@ -388,7 +411,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Clean up any existing duplicates when page loads
             setTimeout(() => {
-                cleanupDuplicates();
+                removeDuplicates();
             }, 500); // Wait for DataTable to fully initialize
 
             const verifyBtn = document.getElementById('verifyBtn');
@@ -442,11 +465,11 @@
                                 console.log('Data retrieved from cache, not updating table');
 
                                 // Just highlight the existing row if it exists
-                                highlightExistingRow(data.data.phone_number || data.data.number);
+                                highlightRow(data.data.phone_number || data.data.number);
                             } else {
                                 showAlert('success', 'Success', 'Phone number verified successfully!');
                                 // Only add/update table for fresh API data
-                                addOrUpdateVerificationInTable(data.data);
+                                updateTableRow(data.data);
                             }
                         } else {
                             phoneInput.classList.add('is-invalid');
@@ -643,7 +666,7 @@
                                 data.data.forEach(verification => {
                                     // Only update table if this is fresh data (not cached)
                                     if (verification.source !== 'cache') {
-                                        addOrUpdateVerificationInTable(verification);
+                                        updateTableRow(verification);
                                     }
                                 });
                             }

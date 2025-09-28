@@ -24,7 +24,7 @@ class TmtVerificationService
     public function verifyNumber($phoneNumber, $dataFreshness = null)
     {
         // Determine if we should force fresh data
-        $shouldForceFresh = $this->shouldForceFreshData($dataFreshness);
+        $shouldForceFresh = $this->forceFresh($dataFreshness);
 
         if (!$shouldForceFresh) {
             // 1. Check Redis cache first
@@ -32,9 +32,9 @@ class TmtVerificationService
             $cachedResult = Cache::get($cacheKey);
             if ($cachedResult) {
                 // Check if cached data meets freshness requirements
-                if ($this->isCachedDataFresh($cachedResult, $dataFreshness)) {
+                if ($this->isCacheFresh($cachedResult, $dataFreshness)) {
                     Log::info('Phone verification found in Redis cache', ['phone' => $phoneNumber]);
-                    return $this->formatCachedResult($cachedResult);
+                    return $this->formatCached($cachedResult);
                 } else {
                     // Cached data is too old, remove it
                     Cache::forget($cacheKey);
@@ -44,11 +44,11 @@ class TmtVerificationService
 
             // 2. Check database if not in cache
             $dbResult = Verification::where('number', $phoneNumber)->latest()->first();
-            if ($dbResult && $this->isDatabaseDataFresh($dbResult, $dataFreshness)) {
+            if ($dbResult && $this->isDbFresh($dbResult, $dataFreshness)) {
                 Log::info('Phone verification found in database', ['phone' => $phoneNumber]);
                 // Cache the database result for future requests
                 Cache::put($cacheKey, $dbResult, now()->addHour());
-                return $this->formatCachedResult($dbResult);
+                return $this->formatCached($dbResult);
             } elseif ($dbResult) {
                 Log::info('Database data too old, forcing fresh API call', ['phone' => $phoneNumber]);
             }
@@ -68,7 +68,7 @@ class TmtVerificationService
         $apiCalls = 0;
 
         // Determine if we should force fresh data
-        $shouldForceFresh = $this->shouldForceFreshData($dataFreshness);
+        $shouldForceFresh = $this->forceFresh($dataFreshness);
 
         foreach ($phoneNumbers as $phoneNumber) {
             if (!$shouldForceFresh) {
@@ -76,9 +76,9 @@ class TmtVerificationService
                 $cacheKey = 'phone_verification:' . $phoneNumber;
                 $cachedResult = Cache::get($cacheKey);
 
-                if ($cachedResult && $this->isCachedDataFresh($cachedResult, $dataFreshness)) {
+                if ($cachedResult && $this->isCacheFresh($cachedResult, $dataFreshness)) {
                     $cacheHits++;
-                    $result = $this->formatCachedResult($cachedResult);
+                    $result = $this->formatCached($cachedResult);
                     $result['source'] = 'cache';
                     $results[] = $result;
                     usleep(100000);
@@ -90,10 +90,10 @@ class TmtVerificationService
 
                 // Check database
                 $dbResult = Verification::where('number', $phoneNumber)->latest()->first();
-                if ($dbResult && $this->isDatabaseDataFresh($dbResult, $dataFreshness)) {
+                if ($dbResult && $this->isDbFresh($dbResult, $dataFreshness)) {
                     $dbHits++;
                     Cache::put($cacheKey, $dbResult, now()->addHour());
-                    $result = $this->formatCachedResult($dbResult);
+                    $result = $this->formatCached($dbResult);
                     $result['source'] = 'database';
                     $results[] = $result;
                     usleep(100000);
@@ -144,7 +144,7 @@ class TmtVerificationService
         ];
     }
 
-    private function formatCachedResult($result)
+    private function formatCached($result)
     {
         // Handle both Verification model and cached array
         if ($result instanceof Verification) {
@@ -216,7 +216,7 @@ private function makeApiCall($phoneNumber)
         $result = $this->formatResponse($data);
 
         if ($result['success']) {
-            $this->saveAndCacheResult($result);
+            $this->saveResult($result);
         }
 
         return $result;
@@ -233,7 +233,7 @@ private function makeApiCall($phoneNumber)
  * @param array $resultData The formatted verification data.
  * @return void
  */
-private function saveAndCacheResult(array $resultData)
+private function saveResult(array $resultData)
 {
     try {
         // Use updateOrCreate to find a record by 'number' and update it,
@@ -280,12 +280,12 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
     ];
 }
 
-    private function shouldForceFreshData($dataFreshness)
+    private function forceFresh($dataFreshness)
     {
         return $dataFreshness === 'all';
     }
 
-    private function isCachedDataFresh($cachedResult, $dataFreshness)
+    private function isCacheFresh($cachedResult, $dataFreshness)
     {
         if (!$dataFreshness || $dataFreshness === '') {
             return true; // Use cached data if available
@@ -307,10 +307,10 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
             return false; // No timestamp, force fresh
         }
 
-        return $this->isDataWithinFreshnessLimit($cachedTimestamp, $dataFreshness);
+        return $this->isWithinLimit($cachedTimestamp, $dataFreshness);
     }
 
-    private function isDatabaseDataFresh($dbResult, $dataFreshness)
+    private function isDbFresh($dbResult, $dataFreshness)
     {
         if (!$dataFreshness || $dataFreshness === '') {
             return true; // Use database data if available
@@ -320,10 +320,10 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
             return false; // Force fresh data
         }
 
-        return $this->isDataWithinFreshnessLimit($dbResult->created_at, $dataFreshness);
+        return $this->isWithinLimit($dbResult->created_at, $dataFreshness);
     }
 
-    private function isDataWithinFreshnessLimit($timestamp, $dataFreshness)
+    private function isWithinLimit($timestamp, $dataFreshness)
     {
         $days = (int) $dataFreshness;
         if ($days <= 0) {

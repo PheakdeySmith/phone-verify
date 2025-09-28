@@ -36,7 +36,7 @@ class Verification extends Model
 
     public function isSuccessful(): bool
     {
-        return $this->status === 0 && $this->error === 0;
+        return $this->status === 0;
     }
 
     public function getStatusTextAttribute(): string
