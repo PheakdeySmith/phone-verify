@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(php artisan tinker:*)",
-      "Read(//mnt/c/Users/pheak/OneDrive/Pictures/Screenshots/**)"
+      "Read(//mnt/c/Users/pheak/OneDrive/Pictures/Screenshots/**)",
+      "Bash(php artisan:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []
