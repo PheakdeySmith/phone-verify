@@ -22,15 +22,20 @@ class VerificationController extends Controller
     {
         $request->validate([
         'phone_number' => 'required|string',
-        'data_freshness' => 'nullable|string' 
+        'data_freshness' => 'nullable|string',
+        'validation_info' => 'nullable|array'
     ]);
 
     $phoneNumber = $request->phone_number;
-    // FIX: Get 'data_freshness' from the request.
-    $dataFreshness = $request->data_freshness; 
+    $dataFreshness = $request->data_freshness;
+    $validationInfo = $request->validation_info;
 
-    // FIX: Pass the value to the service.
-    $result = $this->verificationService->verifyNumber($phoneNumber, $dataFreshness);
+    // Check if phone number has live coverage based on validation
+    if ($validationInfo && !$validationInfo['live_coverage']) {
+        \Log::info("Phone number {$phoneNumber} has no live coverage, proceeding with limited verification");
+    }
+
+    $result = $this->verificationService->verifyNumber($phoneNumber, $dataFreshness, $validationInfo);
 
         // If result is cached, return it directly
         if (isset($result['cached']) && $result['cached']) {

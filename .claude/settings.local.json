@@ -4,7 +4,8 @@
       "Bash(php artisan tinker:*)",
       "Read(//mnt/c/Users/pheak/OneDrive/Pictures/Screenshots/**)",
       "Bash(php artisan:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(php:*)"
     ],
     "deny": [],
     "ask": []

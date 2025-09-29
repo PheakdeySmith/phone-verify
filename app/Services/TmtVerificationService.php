@@ -21,7 +21,7 @@ class TmtVerificationService
         $this->apiSecret = env('API_SECRET');
     }
 
-    public function verifyNumber($phoneNumber, $dataFreshness = null)
+    public function verifyNumber($phoneNumber, $dataFreshness = null, $validationInfo = null)
     {
         // Determine if we should force fresh data
         $shouldForceFresh = $this->forceFresh($dataFreshness);
@@ -57,7 +57,7 @@ class TmtVerificationService
         }
 
         // 3. If not found in cache/database or data is too old, make API call
-        return $this->makeApiCall($phoneNumber);
+        return $this->makeApiCall($phoneNumber, $validationInfo);
     }
 
     public function verifyBatch(array $phoneNumbers, $dataFreshness = null)
@@ -103,7 +103,7 @@ class TmtVerificationService
 
             // Make API call if no fresh cached/database data or forcing fresh
             $apiCalls++;
-            $result = $this->makeApiCall($phoneNumber);
+            $result = $this->makeApiCall($phoneNumber, null);
             $result['source'] = 'api';
             $results[] = $result;
             usleep(100000);
@@ -178,20 +178,48 @@ class TmtVerificationService
  * @param string $phoneNumber The phone number to verify.
  * @return array The verification result.
  */
-private function makeApiCall($phoneNumber)
+private function makeApiCall($phoneNumber, $validationInfo = null)
 {
-    // 1. Validate credentials first
+    // 1. Check live coverage first if validation info is provided and has carrier data
+    if ($validationInfo && isset($validationInfo['has_carrier_data']) && $validationInfo['has_carrier_data'] &&
+        isset($validationInfo['live_coverage']) && !$validationInfo['live_coverage']) {
+        Log::info('Skipping API call for phone number with no live coverage', [
+            'phone' => $phoneNumber,
+            'carrier' => $validationInfo['carrier_name'] ?? 'Unknown',
+            'country' => $validationInfo['iso2'] ?? 'Unknown'
+        ]);
+
+        return [
+            'success' => false,
+            'error' => 'Phone number has no live coverage - API verification skipped to save costs',
+            'phone_number' => $phoneNumber,
+            'network' => $validationInfo['carrier_name'] ?? 'Unknown',
+            'country_code' => $validationInfo['country_code'] ?? null,
+            'iso2' => $validationInfo['iso2'] ?? null,
+            'mcc' => $validationInfo['mcc'] ?? null,
+            'mnc' => $validationInfo['mnc'] ?? null,
+            'type' => 'mobile',
+            'status' => 999, // Custom status for no live coverage
+            'status_text' => 'No Live Coverage',
+            'ported' => false,
+            'present' => 'no',
+            'trxid' => null,
+            'skip_reason' => 'no_live_coverage'
+        ];
+    }
+
+    // 2. Validate credentials
     if (empty($this->apiKey) || empty($this->apiSecret)) {
         return $this->handleApiError('TMT API credentials not configured', $phoneNumber, 'Configuration Error');
     }
 
     try {
-        // 2. Make the API call
+        // 3. Make the API call
         $url = "{$this->baseUrl}/format/{$this->apiKey}/{$this->apiSecret}/{$phoneNumber}";
         Log::info('TMT API Request - cache miss', ['phone' => $phoneNumber]);
         $response = Http::get($url);
 
-        // 3. Handle unsuccessful HTTP responses (e.g., 404, 500)
+        // 4. Handle unsuccessful HTTP responses (e.g., 404, 500)
         if (!$response->successful()) {
             return $this->handleApiError(
                 'API request failed with status: ' . $response->status(),
@@ -203,7 +231,7 @@ private function makeApiCall($phoneNumber)
 
         $data = $response->json();
 
-        // 4. Handle cases where the API returns an empty but successful response
+        // 5. Handle cases where the API returns an empty but successful response
         if (empty($data)) {
             return $this->handleApiError(
                 'API returned an empty response. Please check API credentials.',
@@ -212,7 +240,7 @@ private function makeApiCall($phoneNumber)
             );
         }
 
-        // 5. Format the data and persist it if the verification was successful
+        // 6. Format the data and persist it if the verification was successful
         $result = $this->formatResponse($data);
 
         if ($result['success']) {
@@ -222,7 +250,7 @@ private function makeApiCall($phoneNumber)
         return $result;
 
     } catch (Exception $e) {
-        // 6. Catch any other exceptions (e.g., network connection issues)
+        // 7. Catch any other exceptions (e.g., network connection issues)
         return $this->handleApiError($e->getMessage(), $phoneNumber, 'Exception Error');
     }
 }

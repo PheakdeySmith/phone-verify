@@ -139,7 +139,19 @@
                         @csrf
                         <div class="mb-3">
                             <label for="phone_number" class="col-form-label">Enter Phone Number</label>
-                            <input type="tel" class="form-control" id="phone_number" name="phone_number" required>
+                            <input type="tel" class="form-control" id="phone_number" name="phone_number"
+                                placeholder="e.g., 85592313242" required>
+                            <div class="form-text">Enter the full phone number including country code</div>
+                            <div id="phone-validation-info" class="mt-2" style="display: none;">
+                                <div class="alert mb-0" id="validation-alert">
+                                    <div id="carrier-info">
+                                        <strong>Detected:</strong> <span id="detected-info"></span>
+                                    </div>
+                                    <div id="api-recommendation" class="mt-1">
+                                        <strong>API Recommendation:</strong> <span id="recommendation-text"></span>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="invalid-feedback" id="phone-error"></div>
                         </div>
                         <div class="mb-3">
@@ -420,7 +432,122 @@
             const spinner = verifyBtn.querySelector('.spinner-border');
             const modal = document.getElementById('verify');
 
-            verifyBtn.addEventListener('click', function() {
+            // Phone validation cache
+            let phoneValidationCache = {};
+
+            // Real-time phone validation
+            async function validatePhoneNumber(phoneNumber) {
+                const validationInfo = document.getElementById('phone-validation-info');
+                const validationAlert = document.getElementById('validation-alert');
+                const detectedInfo = document.getElementById('detected-info');
+                const recommendationText = document.getElementById('recommendation-text');
+
+                if (!phoneNumber || phoneNumber.length < 1) {
+                    validationInfo.style.display = 'none';
+                    phoneInput.classList.remove('is-valid', 'is-invalid');
+                    return null;
+                }
+
+                // Clean phone number (remove non-digits)
+                const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
+
+                if (cleanNumber.length === 0) {
+                    validationInfo.style.display = 'none';
+                    phoneInput.classList.remove('is-valid', 'is-invalid');
+                    return null;
+                }
+
+                // Check cache first
+                if (phoneValidationCache[cleanNumber]) {
+                    const cachedResult = phoneValidationCache[cleanNumber];
+                    displayValidationResult(cachedResult);
+                    return cachedResult;
+                }
+
+                try {
+                    const response = await fetch('/country-check/check', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
+                                .getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            phone_number: cleanNumber
+                        })
+                    });
+
+                    const result = await response.json();
+
+                    // Cache the result
+                    phoneValidationCache[cleanNumber] = result;
+
+                    displayValidationResult(result);
+                    return result;
+                } catch (error) {
+                    console.error('Phone validation error:', error);
+                    validationInfo.style.display = 'none';
+                    return null;
+                }
+            }
+
+            function displayValidationResult(result) {
+                const validationInfo = document.getElementById('phone-validation-info');
+                const validationAlert = document.getElementById('validation-alert');
+                const detectedInfo = document.getElementById('detected-info');
+                const recommendationText = document.getElementById('recommendation-text');
+
+                if (result.success) {
+                    const countryName = result.country_name || (result.iso2 ? result.iso2.toUpperCase() : 'Unknown');
+
+                    // Check if we have carrier data for this country
+                    if (result.has_carrier_data) {
+                        // Country with carrier data
+                        const carrierName = result.carrier_name || 'Unknown';
+                        detectedInfo.textContent = `${countryName} (+${result.country_code}) - ${carrierName}`;
+
+                        if (result.live_coverage) {
+                            validationAlert.className = 'alert alert-success mb-0';
+                            recommendationText.textContent = 'This number has live coverage. Proceed with API verification.';
+                        } else {
+                            validationAlert.className = 'alert alert-warning mb-0';
+                            recommendationText.textContent = 'This number has no live coverage. API verification will be skipped to save costs.';
+                        }
+                    } else {
+                        // Country without carrier data
+                        detectedInfo.textContent = `${countryName} (+${result.country_code}) - No carrier data available`;
+                        validationAlert.className = 'alert alert-info mb-0';
+                        recommendationText.textContent = 'Country recognized, but no carrier coverage data available. API verification will proceed normally.';
+                    }
+
+                    phoneInput.classList.remove('is-invalid');
+                    phoneInput.classList.add('is-valid');
+                    validationInfo.style.display = 'block';
+                } else {
+                    // Completely invalid
+                    validationAlert.className = 'alert alert-danger mb-0';
+                    detectedInfo.textContent = 'Invalid phone number or unsupported country';
+                    recommendationText.textContent = 'Please check the phone number format.';
+                    validationInfo.style.display = 'block';
+                    phoneInput.classList.remove('is-valid');
+                    phoneInput.classList.add('is-invalid');
+                    phoneError.textContent = result.error || 'Invalid phone number';
+                }
+            }
+
+            // Add real-time validation to phone input
+            phoneInput.addEventListener('input', function(e) {
+                // Clear previous error messages when user starts typing
+                phoneError.textContent = '';
+
+                // Debounce the validation call
+                clearTimeout(phoneInput.validationTimeout);
+                phoneInput.validationTimeout = setTimeout(() => {
+                    validatePhoneNumber(e.target.value);
+                }, 500);
+            });
+
+            verifyBtn.addEventListener('click', async function() {
                 const phoneNumber = phoneInput.value.trim();
                 const dataFreshness = document.getElementById('data_freshness').value;
 
@@ -438,6 +565,43 @@
                 verifyBtn.disabled = true;
                 spinner.classList.remove('d-none');
                 verifyBtn.innerHTML =
+                    '<span class="spinner-border spinner-border-sm" role="status"></span> Validating...';
+
+                // First validate the phone number
+                const validationResult = await validatePhoneNumber(phoneNumber);
+
+                if (!validationResult || !validationResult.success) {
+                    phoneInput.classList.add('is-invalid');
+                    phoneError.textContent = validationResult?.error || 'Invalid phone number format';
+                    showAlert('danger', 'Validation Failed', validationResult?.error || 'Please enter a valid phone number.');
+
+                    // Reset button state
+                    verifyBtn.disabled = false;
+                    spinner.classList.add('d-none');
+                    verifyBtn.innerHTML = 'Verify';
+                    return;
+                }
+
+                // Check if phone has live coverage (only for countries with carrier data)
+                if (validationResult.has_carrier_data && !validationResult.live_coverage) {
+                    // Show warning but still allow user to proceed
+                    const proceed = confirm(
+                        'This phone number has no live coverage according to our database. ' +
+                        'API verification will likely fail and cost money. ' +
+                        'Do you want to proceed anyway?'
+                    );
+
+                    if (!proceed) {
+                        // Reset button state
+                        verifyBtn.disabled = false;
+                        spinner.classList.add('d-none');
+                        verifyBtn.innerHTML = 'Verify';
+                        return;
+                    }
+                }
+
+                // Update button text
+                verifyBtn.innerHTML =
                     '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
                 // Make API call
@@ -450,7 +614,8 @@
                         },
                         body: JSON.stringify({
                             phone_number: phoneNumber,
-                            data_freshness: dataFreshness
+                            data_freshness: dataFreshness,
+                            validation_info: validationResult // Pass validation info to backend
                         })
                     })
                     .then(response => response.json())
@@ -467,7 +632,13 @@
                                 // Just highlight the existing row if it exists
                                 highlightRow(data.data.phone_number || data.data.number);
                             } else {
-                                showAlert('success', 'Success', 'Phone number verified successfully!');
+                                let successMessage = 'Phone number verified successfully!';
+                                if (validationResult.has_carrier_data && !validationResult.live_coverage) {
+                                    successMessage += ' (Note: Number has no live coverage - verification may be limited)';
+                                } else if (!validationResult.has_carrier_data) {
+                                    successMessage += ' (Note: No carrier coverage data available for this country)';
+                                }
+                                showAlert('success', 'Success', successMessage);
                                 // Only add/update table for fresh API data
                                 updateTableRow(data.data);
                             }
@@ -494,8 +665,9 @@
             $(modal).on('hidden.bs.modal', function() {
                 phoneInput.value = '';
                 document.getElementById('data_freshness').value = '';
-                phoneInput.classList.remove('is-invalid');
+                phoneInput.classList.remove('is-invalid', 'is-valid');
                 phoneError.textContent = '';
+                document.getElementById('phone-validation-info').style.display = 'none';
                 verifyBtn.disabled = false;
                 spinner.classList.add('d-none');
                 verifyBtn.innerHTML = 'Verify';
