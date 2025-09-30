@@ -8,10 +8,10 @@
 
 @section('main-content')
     <div class="breadcrumb">
-        <h1>Verification</h1>
+        <h1>Network Prefix Verification</h1>
         <ul>
             <li><a href="">Form</a></li>
-            <li>Verify Phone Numbers</li>
+            <li>Smart Phone Verification</li>
         </ul>
     </div>
 
@@ -40,23 +40,22 @@
     </div>
 
     <div class="row">
-
         <div class="col-md-12 mb-4">
             <div class="card text-start">
-
                 <div class="card-body">
-                    <h4 class="card-title mb-3">Phone Number Table</h4>
+                    <h4 class="card-title mb-3">Network Prefix Verification Table</h4>
                     <a href="{{ route('verification.export') }}" class="btn btn-secondary mb-3">Export to Excel</a>
                     <div class="table-responsive">
-                        <table id="deafult_ordering_table" class="display table table-striped table-bordered"
+                        <table id="network_verification_table" class="display table table-striped table-bordered"
                             style="width:100%">
-                            {{-- @include('datatables.table_content') --}}
-
                             <thead>
                                 <tr>
                                     <th>Number</th>
+                                    <th>Country</th>
+                                    <th>Min/Max Length</th>
                                     <th>Network</th>
                                     <th>MCC/MNC</th>
+                                    <th>Live Coverage</th>
                                     <th>Type</th>
                                     <th>Status</th>
                                     <th>Ported</th>
@@ -69,8 +68,23 @@
                                 @forelse ($verifications as $verification)
                                     <tr data-phone="{{ $verification->number }}">
                                         <td>{{ $verification->number }}</td>
-                                        <td>{{ $verification->network ?? 'Unknown' }}</td>
+                                        <td>{{ $verification->country_name ?? 'Unknown' }}</td>
+                                        <td>{{ $verification->min_length ?? 'N/A' }}/{{ $verification->max_length ?? 'N/A' }}</td>
+                                        <td>{{ $verification->network_name ?? 'Unknown' }}</td>
                                         <td>{{ $verification->mcc }}/{{ $verification->mnc }}</td>
+                                        <td>
+                                            @if(isset($verification->prefix))
+                                                @php
+                                                    $networkPrefix = App\Models\NetworkPrefix::where('prefix', $verification->prefix)->first();
+                                                    $liveCoverage = $networkPrefix ? $networkPrefix->live_coverage : false;
+                                                @endphp
+                                                <span class="badge badge-pill badge-outline-{{ $liveCoverage ? 'success' : 'danger' }} p-2 m-1">
+                                                    {{ $liveCoverage ? 'Yes' : 'No' }}
+                                                </span>
+                                            @else
+                                                <span class="badge badge-pill badge-outline-secondary p-2 m-1">Unknown</span>
+                                            @endif
+                                        </td>
                                         <td>{{ ucfirst($verification->type ?? 'unknown') }}</td>
                                         <td>
                                             <span
@@ -86,21 +100,20 @@
                                         </td>
                                         <td>
                                             @php
-                                                // Ensure present value is only yes, no, or na
                                                 $present = strtolower($verification->present ?? 'na');
                                                 if (!in_array($present, ['yes', 'no', 'na'])) {
                                                     $present = 'na';
                                                 }
 
                                                 $presentText = ucfirst($present);
-                                                $presentClass = 'secondary'; // Default color (gray) for na
+                                                $presentClass = 'secondary';
 
                                                 if ($present === 'yes') {
-                                                    $presentClass = 'success'; // Green for 'yes'
+                                                    $presentClass = 'success';
                                                 } elseif ($present === 'no') {
-                                                    $presentClass = 'danger'; // Red for 'no'
+                                                    $presentClass = 'danger';
                                                 } elseif ($present === 'na') {
-                                                    $presentClass = 'secondary'; // Gray for 'na' (Not available)
+                                                    $presentClass = 'secondary';
                                                 }
                                             @endphp
 
@@ -112,19 +125,13 @@
                                         <td>{{ $verification->created_at->format('Y-m-d H:i') }}</td>
                                     </tr>
                                 @empty
-                                    {{-- <tr>
-                                        <td colspan="9" class="text-center">No verification results found!</td>
-                                    </tr> --}}
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
-
                 </div>
             </div>
         </div>
-        <!-- end of col -->
-
     </div>
 
     <!-- Modal -->
@@ -132,7 +139,7 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="verifyLabel">Verify Phone Number</h5>
+                    <h5 class="modal-title" id="verifyLabel">Smart Phone Number Verification</h5>
                 </div>
                 <div class="modal-body">
                     <form id="verifyForm">
@@ -144,8 +151,11 @@
                             <div class="form-text">Enter the full phone number including country code</div>
                             <div id="phone-validation-info" class="mt-2" style="display: none;">
                                 <div class="alert mb-0" id="validation-alert">
-                                    <div id="carrier-info">
-                                        <strong>Detected:</strong> <span id="detected-info"></span>
+                                    <div id="network-info">
+                                        <strong>Network Detected:</strong> <span id="detected-info"></span>
+                                    </div>
+                                    <div id="coverage-info" class="mt-1">
+                                        <strong>Live Coverage:</strong> <span id="coverage-status"></span>
                                     </div>
                                     <div id="api-recommendation" class="mt-1">
                                         <strong>API Recommendation:</strong> <span id="recommendation-text"></span>
@@ -163,8 +173,7 @@
                                 <option value="90">Force refresh if data is older than 90 days</option>
                                 <option value="all">Always get fresh data from API</option>
                             </select>
-                            <div class="form-text">Select when to fetch fresh data from the API vs using cached results
-                            </div>
+                            <div class="form-text">Select when to fetch fresh data from the API vs using cached results</div>
                         </div>
                     </form>
                 </div>
@@ -183,14 +192,13 @@
         <div class="modal-dialog" role="document">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="uploadLabel">Batch Verification</h5>
+                    <h5 class="modal-title" id="uploadLabel">Batch Network Verification</h5>
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="file-upload" class="form-label">Upload Excel File</label>
                         <input type="file" class="form-control" id="file-upload" accept=".xlsx,.xls,.csv" required>
-                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the
-                            first column</div>
+                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the first column</div>
                         <div class="invalid-feedback" id="batch-error"></div>
                     </div>
                     <div class="mb-3" id="file-preview" style="display: none;">
@@ -246,22 +254,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
-        // Alert Functions
+        // Alert Functions (copied from existing verify.blade.php)
         function showAlert(type, title, message) {
             const alertContainer = document.getElementById('alert-container');
             const alertMessage = document.getElementById('alert-message');
             const alertTitle = document.getElementById('alert-title');
             const alertText = document.getElementById('alert-text');
 
-            // Remove existing alert classes
             alertMessage.className = 'alert';
-
-            // Add new alert type class
             alertMessage.classList.add('alert-' + type);
-
             alertTitle.textContent = title + '!';
 
-            // Handle multi-line messages by replacing \n with <br>
             if (message.includes('\n')) {
                 alertText.innerHTML = message.replace(/\n/g, '<br>');
             } else {
@@ -270,7 +273,6 @@
 
             alertContainer.style.display = 'block';
 
-            // Auto-hide success messages after 8 seconds (increased for cache stats)
             if (type === 'success') {
                 setTimeout(() => {
                     hideAlert();
@@ -283,14 +285,12 @@
             alertContainer.style.display = 'none';
         }
 
-        // assets/js/your-script-file.js
-
+        // Update table row function
         function updateTableRow(verificationData) {
-            console.log('updateTableRow called with:', verificationData); // Debug log
-            const table = $('#deafult_ordering_table').DataTable();
+            console.log('updateTableRow called with:', verificationData);
+            const table = $('#network_verification_table').DataTable();
             const phoneNumber = verificationData.phone_number || verificationData.number;
 
-            // --- Prepare the new row's data ---
             const now = new Date();
             const formattedDate = now.getFullYear() + '-' +
                 String(now.getMonth() + 1).padStart(2, '0') + '-' +
@@ -303,28 +303,41 @@
             const portedClass = verificationData.ported ? 'success' : 'secondary';
             const portedText = verificationData.ported ? 'Yes' : 'No';
 
+            // Determine live coverage status
+            let liveCoverageClass = 'secondary';
+            let liveCoverageText = 'Unknown';
+
+            if (verificationData.skip_reason === 'no_live_coverage') {
+                liveCoverageClass = 'danger';
+                liveCoverageText = 'No';
+            } else if (verificationData.prefix_info && verificationData.prefix_info.live_coverage !== undefined) {
+                liveCoverageClass = verificationData.prefix_info.live_coverage ? 'success' : 'danger';
+                liveCoverageText = verificationData.prefix_info.live_coverage ? 'Yes' : 'No';
+            }
+
             const rowData = [
                 phoneNumber,
+                verificationData.country_name || 'Unknown',
+                (verificationData.min_length || 'N/A') + '/' + (verificationData.max_length || 'N/A'),
                 verificationData.network || 'Unknown',
                 (verificationData.mcc || '') + '/' + (verificationData.mnc || ''),
-                verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) :
-                'Unknown',
+                `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
+                verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) : 'Unknown',
                 `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
                 `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
                 (() => {
-                    // Ensure present value is only yes, no, or na
                     let present = verificationData.present ? verificationData.present.toLowerCase() : 'na';
                     if (!['yes', 'no', 'na'].includes(present)) {
                         present = 'na';
                     }
 
                     const presentText = present.charAt(0).toUpperCase() + present.slice(1);
-                    let presentClass = 'secondary'; // Default gray for na
+                    let presentClass = 'secondary';
 
                     if (present === 'yes') {
-                        presentClass = 'success'; // Green for yes
+                        presentClass = 'success';
                     } else if (present === 'no') {
-                        presentClass = 'danger'; // Red for no
+                        presentClass = 'danger';
                     }
 
                     return `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`;
@@ -333,32 +346,27 @@
                 formattedDate
             ];
 
-            // --- New, more efficient logic to find and update/add the row ---
             const existingRow = table.row('tr[data-phone="' + phoneNumber + '"]');
 
             if (existingRow.any()) {
-                // --- Row EXISTS, so UPDATE it ---
                 console.log('Found existing row for phone:', phoneNumber, '. Updating it.');
-                existingRow.data(rowData).draw(false); // Update data and redraw
+                existingRow.data(rowData).draw(false);
 
                 const updatedNode = existingRow.node();
-                $(updatedNode).css('background-color', '#fff3cd'); // Yellow highlight for update
+                $(updatedNode).css('background-color', '#fff3cd');
                 setTimeout(() => {
                     $(updatedNode).css('background-color', '');
                 }, 3000);
 
                 console.log('Row updated successfully');
-
             } else {
-                // --- Row does NOT exist, so ADD it ---
                 console.log('No existing row found. Adding fresh row for phone:', phoneNumber);
-                const newRow = table.row.add(rowData).draw(false); // Add and redraw
+                const newRow = table.row.add(rowData).draw(false);
 
-                // Set the data-phone attribute on the new <tr> for future lookups
                 const newNode = newRow.node();
                 $(newNode).attr('data-phone', phoneNumber);
 
-                $(newNode).css('background-color', '#e8f5e8'); // Green highlight for new
+                $(newNode).css('background-color', '#e8f5e8');
                 setTimeout(() => {
                     $(newNode).css('background-color', '');
                 }, 3000);
@@ -367,80 +375,41 @@
             }
         }
 
-        // Function to highlight existing row for cached data
+        // Highlight existing row for cached data
         function highlightRow(phoneNumber) {
-            const table = $('#deafult_ordering_table').DataTable();
+            const table = $('#network_verification_table').DataTable();
 
             table.rows().every(function(rowIdx, tableLoop, rowLoop) {
                 const data = this.data();
                 if (data && data[0] === phoneNumber) {
                     const rowNode = this.node();
 
-                    // Add blue highlight for cached data
                     $(rowNode).css('background-color', '#cce5ff');
                     setTimeout(() => {
                         $(rowNode).css('background-color', '');
                     }, 2000);
 
                     console.log('Highlighted existing row for cached data:', phoneNumber);
-                    return false; // Break the loop
+                    return false;
                 }
             });
-        }
-
-        // Function to clean up any existing duplicates in the table
-        function removeDuplicates() {
-            const table = $('#deafult_ordering_table').DataTable();
-            const phoneNumbers = new Set();
-            const rowsToRemove = [];
-
-            // Find duplicate rows
-            table.rows().every(function(rowIdx, tableLoop, rowLoop) {
-                const data = this.data();
-                if (data && data[0]) {
-                    const phoneNumber = data[0];
-                    if (phoneNumbers.has(phoneNumber)) {
-                        // This is a duplicate, mark for removal
-                        rowsToRemove.push(rowIdx);
-                        console.log('Found duplicate row for phone:', phoneNumber, 'at index:', rowIdx);
-                    } else {
-                        phoneNumbers.add(phoneNumber);
-                    }
-                }
-            });
-
-            // Remove duplicates (in reverse order to maintain correct indices)
-            for (let i = rowsToRemove.length - 1; i >= 0; i--) {
-                table.row(rowsToRemove[i]).remove();
-                console.log('Removed duplicate row at index:', rowsToRemove[i]);
-            }
-
-            if (rowsToRemove.length > 0) {
-                table.draw(false);
-                console.log('Cleaned up', rowsToRemove.length, 'duplicate rows');
-            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Clean up any existing duplicates when page loads
-            setTimeout(() => {
-                removeDuplicates();
-            }, 500); // Wait for DataTable to fully initialize
-
             const verifyBtn = document.getElementById('verifyBtn');
             const phoneInput = document.getElementById('phone_number');
             const phoneError = document.getElementById('phone-error');
             const spinner = verifyBtn.querySelector('.spinner-border');
             const modal = document.getElementById('verify');
 
-            // Phone validation cache
             let phoneValidationCache = {};
 
-            // Real-time phone validation
-            async function validatePhoneNumber(phoneNumber) {
+            // Network prefix validation (new functionality)
+            async function validateNetworkPrefix(phoneNumber) {
                 const validationInfo = document.getElementById('phone-validation-info');
                 const validationAlert = document.getElementById('validation-alert');
                 const detectedInfo = document.getElementById('detected-info');
+                const coverageStatus = document.getElementById('coverage-status');
                 const recommendationText = document.getElementById('recommendation-text');
 
                 if (!phoneNumber || phoneNumber.length < 1) {
@@ -449,7 +418,6 @@
                     return null;
                 }
 
-                // Clean phone number (remove non-digits)
                 const cleanNumber = phoneNumber.replace(/[^0-9]/g, '');
 
                 if (cleanNumber.length === 0) {
@@ -461,12 +429,12 @@
                 // Check cache first
                 if (phoneValidationCache[cleanNumber]) {
                     const cachedResult = phoneValidationCache[cleanNumber];
-                    displayValidationResult(cachedResult);
+                    displayNetworkValidationResult(cachedResult);
                     return cachedResult;
                 }
 
                 try {
-                    const response = await fetch('/country-check/check', {
+                    const response = await fetch('/network-prefix/check', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -479,72 +447,61 @@
                     });
 
                     const result = await response.json();
-
-                    // Cache the result
                     phoneValidationCache[cleanNumber] = result;
-
-                    displayValidationResult(result);
+                    displayNetworkValidationResult(result);
                     return result;
                 } catch (error) {
-                    console.error('Phone validation error:', error);
+                    console.error('Network prefix validation error:', error);
                     validationInfo.style.display = 'none';
                     return null;
                 }
             }
 
-            function displayValidationResult(result) {
+            function displayNetworkValidationResult(result) {
                 const validationInfo = document.getElementById('phone-validation-info');
                 const validationAlert = document.getElementById('validation-alert');
                 const detectedInfo = document.getElementById('detected-info');
+                const coverageStatus = document.getElementById('coverage-status');
                 const recommendationText = document.getElementById('recommendation-text');
 
                 if (result.success) {
-                    const countryName = result.country_name || (result.iso2 ? result.iso2.toUpperCase() : 'Unknown');
+                    const countryName = result.country_name || 'Unknown';
+                    const networkName = result.network_name || 'Unknown';
 
-                    // Check if we have carrier data for this country
-                    if (result.has_carrier_data) {
-                        // Country with carrier data
-                        const carrierName = result.carrier_name || 'Unknown';
-                        detectedInfo.textContent = `${countryName} (+${result.country_code}) - ${carrierName}`;
+                    detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})`;
 
-                        if (result.live_coverage) {
-                            validationAlert.className = 'alert alert-success mb-0';
-                            recommendationText.textContent = 'This number has live coverage. Proceed with API verification.';
-                        } else {
-                            validationAlert.className = 'alert alert-warning mb-0';
-                            recommendationText.textContent = 'This number has no live coverage. API verification will be skipped to save costs.';
-                        }
+                    if (result.live_coverage) {
+                        validationAlert.className = 'alert alert-success mb-0';
+                        coverageStatus.textContent = 'Available - API call will be made';
+                        recommendationText.textContent = 'This number has live coverage. Proceed with API verification.';
                     } else {
-                        // Country without carrier data
-                        detectedInfo.textContent = `${countryName} (+${result.country_code}) - No carrier data available`;
-                        validationAlert.className = 'alert alert-info mb-0';
-                        recommendationText.textContent = 'Country recognized, but no carrier coverage data available. API verification will proceed normally.';
+                        validationAlert.className = 'alert alert-warning mb-0';
+                        coverageStatus.textContent = 'Not Available - API call will be skipped';
+                        recommendationText.textContent = 'This number has no live coverage. API verification will be skipped to save costs.';
                     }
 
                     phoneInput.classList.remove('is-invalid');
                     phoneInput.classList.add('is-valid');
                     validationInfo.style.display = 'block';
                 } else {
-                    // Completely invalid
                     validationAlert.className = 'alert alert-danger mb-0';
-                    detectedInfo.textContent = 'Invalid phone number or unsupported country';
-                    recommendationText.textContent = 'Please check the phone number format.';
+                    detectedInfo.textContent = 'Network prefix not found in database';
+                    coverageStatus.textContent = 'Unknown';
+                    recommendationText.textContent = 'Please check the phone number format or ensure the prefix exists in database.';
                     validationInfo.style.display = 'block';
                     phoneInput.classList.remove('is-valid');
                     phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = result.error || 'Invalid phone number';
+                    phoneError.textContent = '';  // Don't duplicate the error message
                 }
             }
 
             // Add real-time validation to phone input
             phoneInput.addEventListener('input', function(e) {
-                // Clear previous error messages when user starts typing
                 phoneError.textContent = '';
 
-                // Debounce the validation call
                 clearTimeout(phoneInput.validationTimeout);
                 phoneInput.validationTimeout = setTimeout(() => {
-                    validatePhoneNumber(e.target.value);
+                    validateNetworkPrefix(e.target.value);
                 }, 500);
             });
 
@@ -558,42 +515,36 @@
                     return;
                 }
 
-                // Remove previous error state
                 phoneInput.classList.remove('is-invalid');
                 phoneError.textContent = '';
 
-                // Show loading state
                 verifyBtn.disabled = true;
                 spinner.classList.remove('d-none');
-                verifyBtn.innerHTML =
-                    '<span class="spinner-border spinner-border-sm" role="status"></span> Validating...';
+                verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Validating...';
 
-                // First validate the phone number
-                const validationResult = await validatePhoneNumber(phoneNumber);
+                // Validate network prefix first
+                const validationResult = await validateNetworkPrefix(phoneNumber);
 
                 if (!validationResult || !validationResult.success) {
                     phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = validationResult?.error || 'Invalid phone number format';
-                    showAlert('danger', 'Validation Failed', validationResult?.error || 'Please enter a valid phone number.');
+                    phoneError.textContent = validationResult?.error || 'Network prefix not found';
+                    showAlert('danger', 'Validation Failed', validationResult?.error || 'Network prefix not found in database.');
 
-                    // Reset button state
                     verifyBtn.disabled = false;
                     spinner.classList.add('d-none');
                     verifyBtn.innerHTML = 'Verify';
                     return;
                 }
 
-                // Check if phone has live coverage (only for countries with carrier data)
-                if (validationResult.has_carrier_data && !validationResult.live_coverage) {
-                    // Show warning but still allow user to proceed
+                // Check if phone has live coverage
+                if (!validationResult.live_coverage) {
                     const proceed = confirm(
-                        'This phone number has no live coverage according to our database. ' +
-                        'API verification will likely fail and cost money. ' +
-                        'Do you want to proceed anyway?'
+                        'This phone number has no live coverage according to our network prefix database. ' +
+                        'API verification will be skipped to save costs. ' +
+                        'Do you want to proceed with local validation only?'
                     );
 
                     if (!proceed) {
-                        // Reset button state
                         verifyBtn.disabled = false;
                         spinner.classList.add('d-none');
                         verifyBtn.innerHTML = 'Verify';
@@ -601,12 +552,10 @@
                     }
                 }
 
-                // Update button text
-                verifyBtn.innerHTML =
-                    '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
+                verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                // Make API call
-                fetch('{{ route('verification.verify') }}', {
+                // Make API call to new network prefix service
+                fetch('{{ route("network-prefix.verify") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -615,8 +564,7 @@
                         },
                         body: JSON.stringify({
                             phone_number: phoneNumber,
-                            data_freshness: dataFreshness,
-                            validation_info: validationResult // Pass validation info to backend
+                            data_freshness: dataFreshness
                         })
                     })
                     .then(response => response.json())
@@ -624,31 +572,21 @@
                         if (data.success) {
                             $(modal).modal('hide');
 
-                            // Check if this is cached data
                             if (data.cached) {
-                                showAlert('info', 'Cached Result',
-                                    'Phone number verification retrieved from cache.');
-                                console.log('Data retrieved from cache, not updating table');
-
-                                // Just highlight the existing row if it exists
+                                showAlert('info', 'Cached Result', 'Phone number verification retrieved from cache.');
                                 highlightRow(data.data.phone_number || data.data.number);
                             } else {
                                 let successMessage = 'Phone number verified successfully!';
-                                if (validationResult.has_carrier_data && !validationResult.live_coverage) {
-                                    successMessage += ' (Note: Number has no live coverage - verification may be limited)';
-                                } else if (!validationResult.has_carrier_data) {
-                                    successMessage += ' (Note: No carrier coverage data available for this country)';
+                                if (data.data.skip_reason === 'no_live_coverage') {
+                                    successMessage = 'Phone number processed - no live coverage, API call skipped to save costs.';
                                 }
                                 showAlert('success', 'Success', successMessage);
-                                console.log('Single verification object:', data.data); // Debug log
-                                // Only add/update table for fresh API data
                                 updateTableRow(data.data);
                             }
                         } else {
                             phoneInput.classList.add('is-invalid');
                             phoneError.textContent = data.error || 'Verification failed';
-                            showAlert('warning', 'Warning', data.error ||
-                                'Phone number verification failed.');
+                            showAlert('warning', 'Warning', data.error || 'Phone number verification failed.');
                         }
                     })
                     .catch(error => {
@@ -664,6 +602,7 @@
                     });
             });
 
+            // Modal reset functionality
             $(modal).on('hidden.bs.modal', function() {
                 phoneInput.value = '';
                 document.getElementById('data_freshness').value = '';
@@ -682,6 +621,7 @@
                 }
             });
 
+            // Batch verification functionality (copied and adapted)
             const batchVerifyBtn = document.getElementById('batchVerifyBtn');
             const fileUpload = document.getElementById('file-upload');
             const batchError = document.getElementById('batch-error');
@@ -691,6 +631,7 @@
             const previewBody = document.getElementById('preview-body');
             let extractedPhoneNumbers = [];
 
+            // File upload handlers and batch processing (same as original)
             fileUpload.addEventListener('change', function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -703,7 +644,6 @@
                         } else {
                             extractedPhoneNumbers = parseExcel(event.target.result);
                         }
-
                         showPreview(extractedPhoneNumbers);
                     } catch (error) {
                         fileUpload.classList.add('is-invalid');
@@ -735,16 +675,10 @@
             }
 
             function parseExcel(arrayBuffer) {
-                const workbook = XLSX.read(arrayBuffer, {
-                    type: 'array'
-                });
+                const workbook = XLSX.read(arrayBuffer, {type: 'array'});
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-                    header: 1
-                });
-
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
                 const phoneNumbers = [];
 
                 for (let row of jsonData) {
@@ -769,7 +703,6 @@
 
                 fileUpload.classList.remove('is-invalid');
                 batchError.textContent = '';
-
                 previewInfo.textContent = `Found ${phoneNumbers.length} phone numbers`;
                 previewBody.innerHTML = '';
 
@@ -795,58 +728,48 @@
                     return;
                 }
 
-                // Remove previous error state
                 fileUpload.classList.remove('is-invalid');
                 batchError.textContent = '';
 
-                // Show loading state
                 batchVerifyBtn.disabled = true;
                 const batchSpinner = batchVerifyBtn.querySelector('.spinner-border');
                 batchSpinner.classList.remove('d-none');
-                batchVerifyBtn.innerHTML =
-                    '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
+                batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                // Make batch API call
-                fetch('{{ route('verification.batch') }}', {
+                fetch('{{ route("network-prefix.batch") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
-                                .getAttribute('content')
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                         },
                         body: JSON.stringify({
                             phone_numbers: extractedPhoneNumbers,
-                            data_freshness: document.getElementById('batch_data_freshness')
-                                .value
+                            data_freshness: document.getElementById('batch_data_freshness').value
                         })
                     })
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            // Success - close modal, show success alert and add data to table
                             $(batchModal).modal('hide');
 
-                            // Create detailed success message with cache statistics
-                            let successMessage =
-                                `Processed ${data.processed} numbers, ${data.saved} successful verifications.`;
+                            let successMessage = `Processed ${data.processed} numbers, ${data.saved} successful verifications.`;
+                            if (data.skipped_no_coverage > 0) {
+                                successMessage += `\n${data.skipped_no_coverage} numbers skipped (no live coverage).`;
+                            }
                             if (data.cache_message) {
                                 successMessage += `\n\n${data.cache_message}`;
                             }
 
                             showAlert('success', 'Batch Verification Complete', successMessage);
 
-                            // Add or update each verification in the table (only for fresh data)
                             if (data.data && data.data.length > 0) {
                                 data.data.forEach(verification => {
-                                    console.log('Batch verification object:', verification); // Debug log
-                                    // Only update table if this is fresh data (not cached)
                                     if (verification.source !== 'cache') {
                                         updateTableRow(verification);
                                     }
                                 });
                             }
                         } else {
-                            // Show error
                             fileUpload.classList.add('is-invalid');
                             batchError.textContent = data.error || 'Batch verification failed';
                         }
@@ -855,18 +778,15 @@
                         console.error('Error:', error);
                         fileUpload.classList.add('is-invalid');
                         batchError.textContent = 'Network error. Please try again.';
-                        showAlert('danger', 'Error',
-                            'Network error occurred during batch verification. Please try again.');
+                        showAlert('danger', 'Error', 'Network error occurred during batch verification. Please try again.');
                     })
                     .finally(() => {
-                        // Reset button state
                         batchVerifyBtn.disabled = false;
                         batchSpinner.classList.add('d-none');
                         batchVerifyBtn.innerHTML = 'Verify All';
                     });
             });
 
-            // Reset batch form when modal is hidden
             $(batchModal).on('hidden.bs.modal', function() {
                 fileUpload.value = '';
                 document.getElementById('batch_data_freshness').value = '';

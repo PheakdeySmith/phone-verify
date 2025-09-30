@@ -179,4 +179,12 @@ Route::post('country-check/check', 'App\Http\Controllers\CountryCheckController@
 Route::post('country-check/clear-cache', 'App\Http\Controllers\CountryCheckController@clearCache')->name('country.check.clear-cache');
 Route::get('country-check/country-codes', 'App\Http\Controllers\CountryCheckController@getCountryCodes')->name('country.check.codes');
 
+// Network Prefix Verification routes
+Route::get('network-verification', 'App\Http\Controllers\NetworkPrefixVerificationController@index')->name('network-verification.index');
+Route::post('network-prefix/check', 'App\Http\Controllers\NetworkPrefixVerificationController@checkNetworkPrefix')->name('network-prefix.check');
+Route::post('network-prefix/verify', 'App\Http\Controllers\NetworkPrefixVerificationController@verify')->name('network-prefix.verify');
+Route::post('network-prefix/batch', 'App\Http\Controllers\NetworkPrefixVerificationController@verifyBatch')->name('network-prefix.batch');
+Route::get('network-prefix/export', 'App\Http\Controllers\NetworkPrefixVerificationController@export')->name('network-prefix.export');
+Route::get('network-prefix/stats', 'App\Http\Controllers\NetworkPrefixVerificationController@stats')->name('network-prefix.stats');
+
 

@@ -12,10 +12,10 @@ class DatabaseSeeder extends Seeder
      * Seed the application's database.
      */
     public function run(): void
-  {
-      $this->call([
-          CountryCodeSeeder::class,
-          CarrierPrefixMappingSeeder::class,
-      ]);
-  }
+    {
+        $this->call([
+            CountryCodeSeeder::class,
+            NetworkPrefixSeeder::class,
+        ]);
+    }
 }

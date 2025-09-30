@@ -10,8 +10,7 @@
     <div class="breadcrumb">
         <h1>Verification</h1>
         <ul>
-            <li><a href="">Form</a></li>
-            <li>Verify Phone Numbers</li>
+            <li> Phone Numbers</li>
         </ul>
     </div>
 
@@ -48,13 +47,16 @@
                     <h4 class="card-title mb-3">Phone Number Table</h4>
                     <a href="{{ route('verification.export') }}" class="btn btn-secondary mb-3">Export to Excel</a>
                     <div class="table-responsive">
-                        <table id="deafult_ordering_table" class="display table table-striped table-bordered"
+                        <table id="verification_table" class="display table table-striped table-bordered"
                             style="width:100%">
                             {{-- @include('datatables.table_content') --}}
 
                             <thead>
                                 <tr>
                                     <th>Number</th>
+                                    <th>Country</th>
+                                    <th>Min</th>
+                                    <th>Max</th>
                                     <th>Network</th>
                                     <th>MCC/MNC</th>
                                     <th>Type</th>
@@ -66,55 +68,56 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($verifications as $verification)
+                                @forelse ($network_prefixes as $network_prefix)
+                                    @forelse($verifications as $verification)
                                     <tr data-phone="{{ $verification->number }}">
                                         <td>{{ $verification->number }}</td>
-                                        <td>{{ $verification->network ?? 'Unknown' }}</td>
+                                        <td>{{ $verification->network ?? 'unknown' }}</td>
                                         <td>{{ $verification->mcc }}/{{ $verification->mnc }}</td>
                                         <td>{{ ucfirst($verification->type ?? 'unknown') }}</td>
                                         <td>
                                             <span
-                                                class="badge badge-pill badge-outline-{{ $verification->isSuccessful() ? 'success' : 'danger' }} p-2 m-1">
+                                                class="badge badge-pill badge-outline-{{ $verification->issuccessful() ? 'success' : 'danger' }} p-2 m-1">
                                                 {{ $verification->status_text }}
                                             </span>
                                         </td>
                                         <td>
                                             <span
                                                 class="badge badge-pill badge-outline-{{ $verification->ported ? 'success' : 'secondary' }} p-2 m-1">
-                                                {{ $verification->ported ? 'Yes' : 'No' }}
+                                                {{ $verification->ported ? 'yes' : 'no' }}
                                             </span>
                                         </td>
                                         <td>
                                             @php
-                                                // Ensure present value is only yes, no, or na
+                                                // ensure present value is only yes, no, or na
                                                 $present = strtolower($verification->present ?? 'na');
                                                 if (!in_array($present, ['yes', 'no', 'na'])) {
                                                     $present = 'na';
                                                 }
 
-                                                $presentText = ucfirst($present);
-                                                $presentClass = 'secondary'; // Default color (gray) for na
+                                                $presenttext = ucfirst($present);
+                                                $presentclass = 'secondary'; // default color (gray) for na
 
                                                 if ($present === 'yes') {
-                                                    $presentClass = 'success'; // Green for 'yes'
+                                                    $presentclass = 'success'; // green for 'yes'
                                                 } elseif ($present === 'no') {
-                                                    $presentClass = 'danger'; // Red for 'no'
+                                                    $presentclass = 'danger'; // red for 'no'
                                                 } elseif ($present === 'na') {
-                                                    $presentClass = 'secondary'; // Gray for 'na' (Not available)
+                                                    $presentclass = 'secondary'; // gray for 'na' (not available)
                                                 }
                                             @endphp
 
-                                            <span class="badge badge-pill badge-outline-{{ $presentClass }} p-2 m-1">
-                                                {{ $presentText }}
+                                            <span class="badge badge-pill badge-outline-{{ $presentclass }} p-2 m-1">
+                                                {{ $presenttext }}
                                             </span>
                                         </td>
-                                        <td>{{ $verification->trxid ?? 'N/A' }}</td>
-                                        <td>{{ $verification->created_at->format('Y-m-d H:i') }}</td>
+                                        <td>{{ $verification->trxid ?? 'n/a' }}</td>
+                                        <td>{{ $verification->created_at->format('y-m-d h:i') }}</td>
                                     </tr>
                                 @empty
-                                    {{-- <tr>
-                                        <td colspan="9" class="text-center">No verification results found!</td>
-                                    </tr> --}}
+                                    <tr>
+                                        <td colspan="9" class="text-center">no verification results found!</td>
+                                    </tr>
                                 @endforelse
                             </tbody>
                         </table>
@@ -287,7 +290,7 @@
 
         function updateTableRow(verificationData) {
             console.log('updateTableRow called with:', verificationData); // Debug log
-            const table = $('#deafult_ordering_table').DataTable();
+            const table = $('#verification_table').DataTable();
             const phoneNumber = verificationData.phone_number || verificationData.number;
 
             // --- Prepare the new row's data ---
@@ -337,12 +340,11 @@
             const existingRow = table.row('tr[data-phone="' + phoneNumber + '"]');
 
             if (existingRow.any()) {
-                // --- Row EXISTS, so UPDATE it ---
                 console.log('Found existing row for phone:', phoneNumber, '. Updating it.');
-                existingRow.data(rowData).draw(false); // Update data and redraw
+                existingRow.data(rowData).draw(false);
 
                 const updatedNode = existingRow.node();
-                $(updatedNode).css('background-color', '#fff3cd'); // Yellow highlight for update
+                $(updatedNode).css('background-color', '#fff3cd');
                 setTimeout(() => {
                     $(updatedNode).css('background-color', '');
                 }, 3000);
@@ -350,15 +352,13 @@
                 console.log('Row updated successfully');
 
             } else {
-                // --- Row does NOT exist, so ADD it ---
                 console.log('No existing row found. Adding fresh row for phone:', phoneNumber);
-                const newRow = table.row.add(rowData).draw(false); // Add and redraw
+                const newRow = table.row.add(rowData).draw(false); 
 
-                // Set the data-phone attribute on the new <tr> for future lookups
                 const newNode = newRow.node();
                 $(newNode).attr('data-phone', phoneNumber);
 
-                $(newNode).css('background-color', '#e8f5e8'); // Green highlight for new
+                $(newNode).css('background-color', '#e8f5e8');
                 setTimeout(() => {
                     $(newNode).css('background-color', '');
                 }, 3000);
@@ -369,7 +369,7 @@
 
         // Function to highlight existing row for cached data
         function highlightRow(phoneNumber) {
-            const table = $('#deafult_ordering_table').DataTable();
+            const table = $('#verification_table').DataTable();
 
             table.rows().every(function(rowIdx, tableLoop, rowLoop) {
                 const data = this.data();
@@ -390,7 +390,7 @@
 
         // Function to clean up any existing duplicates in the table
         function removeDuplicates() {
-            const table = $('#deafult_ordering_table').DataTable();
+            const table = $('#verification_table').DataTable();
             const phoneNumbers = new Set();
             const rowsToRemove = [];
 
@@ -640,7 +640,6 @@
                                     successMessage += ' (Note: No carrier coverage data available for this country)';
                                 }
                                 showAlert('success', 'Success', successMessage);
-                                console.log('Single verification object:', data.data); // Debug log
                                 // Only add/update table for fresh API data
                                 updateTableRow(data.data);
                             }
@@ -838,7 +837,6 @@
                             // Add or update each verification in the table (only for fresh data)
                             if (data.data && data.data.length > 0) {
                                 data.data.forEach(verification => {
-                                    console.log('Batch verification object:', verification); // Debug log
                                     // Only update table if this is fresh data (not cached)
                                     if (verification.source !== 'cache') {
                                         updateTableRow(verification);

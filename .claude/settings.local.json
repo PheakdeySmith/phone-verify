@@ -5,7 +5,9 @@
       "Read(//mnt/c/Users/pheak/OneDrive/Pictures/Screenshots/**)",
       "Bash(php artisan:*)",
       "Bash(curl:*)",
-      "Bash(php:*)"
+      "Bash(php:*)",
+      "Bash(xargs:*)",
+      "Read(//home/smith/Pictures/Screenshots/**)"
     ],
     "deny": [],
     "ask": []
