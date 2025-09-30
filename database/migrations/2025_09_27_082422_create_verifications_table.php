@@ -18,6 +18,7 @@ return new class extends Migration
         Schema::create('verifications', function (Blueprint $table) {
             $table->id();
             $table->string('number'); // The queried phone number
+            $table->string('prefix')->nullable();
             $table->string('cic')->nullable(); // Carrier Identification Code
             $table->integer('error')->default(0); // Error indicator (0 = ok)
             $table->string('imsi')->nullable(); // First 5 digits of IMSI
@@ -31,12 +32,15 @@ return new class extends Migration
             $table->string('status_message')->nullable(); // Query status message
             $table->string('type')->nullable(); // Phone number type (mobile/fixed)
             $table->string('trxid')->nullable(); // Transaction ID for tracking
+            
+            
             $table->timestamps();
 
             $table->index('number');
             $table->index('created_at');
             $table->index('status');
             $table->index('error');
+            $table->index('prefix');
         });
     }
 

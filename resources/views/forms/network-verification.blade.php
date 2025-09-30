@@ -68,22 +68,17 @@
                                 @forelse ($verifications as $verification)
                                     <tr data-phone="{{ $verification->number }}">
                                         <td>{{ $verification->number }}</td>
-                                        <td>{{ $verification->country_name ?? 'Unknown' }}</td>
-                                        <td>{{ $verification->min_length ?? 'N/A' }}/{{ $verification->max_length ?? 'N/A' }}</td>
-                                        <td>{{ $verification->network_name ?? 'Unknown' }}</td>
+                                        <td>{{ $verification->networkPrefix?->country_name ?? 'Unknown' }}</td>
+                                        <td>{{ ($verification->networkPrefix?->min_length ?? 'N/A') }}/{{ ($verification->networkPrefix?->max_length ?? 'N/A') }}</td>
+                                        <td>{{ $verification->networkPrefix?->network_name ?? 'Unknown' }}</td>
                                         <td>{{ $verification->mcc }}/{{ $verification->mnc }}</td>
                                         <td>
-                                            @if(isset($verification->prefix))
-                                                @php
-                                                    $networkPrefix = App\Models\NetworkPrefix::where('prefix', $verification->prefix)->first();
-                                                    $liveCoverage = $networkPrefix ? $networkPrefix->live_coverage : false;
-                                                @endphp
-                                                <span class="badge badge-pill badge-outline-{{ $liveCoverage ? 'success' : 'danger' }} p-2 m-1">
-                                                    {{ $liveCoverage ? 'Yes' : 'No' }}
-                                                </span>
-                                            @else
-                                                <span class="badge badge-pill badge-outline-secondary p-2 m-1">Unknown</span>
-                                            @endif
+                                            @php
+                                                $liveCoverage = $verification->networkPrefix?->live_coverage ?? $verification->isSuccessful();
+                                            @endphp
+                                            <span class="badge badge-pill badge-outline-{{ $liveCoverage ? 'success' : 'danger' }} p-2 m-1">
+                                                {{ $liveCoverage ? 'Yes' : 'No' }}
+                                            </span>
                                         </td>
                                         <td>{{ ucfirst($verification->type ?? 'unknown') }}</td>
                                         <td>
@@ -156,9 +151,6 @@
                                     </div>
                                     <div id="coverage-info" class="mt-1">
                                         <strong>Live Coverage:</strong> <span id="coverage-status"></span>
-                                    </div>
-                                    <div id="api-recommendation" class="mt-1">
-                                        <strong>API Recommendation:</strong> <span id="recommendation-text"></span>
                                     </div>
                                 </div>
                             </div>
@@ -280,6 +272,84 @@
             }
         }
 
+        // Apple-style batch results display
+        function showBatchResults(data) {
+            // Remove existing results card if any
+            const existingCard = document.getElementById('batch-results-card');
+            if (existingCard) {
+                existingCard.remove();
+            }
+
+            const liveCoverageCount = data.live_coverage_count || 0;
+            const noCoverageCount = data.no_coverage_count || 0;
+            const errorCount = data.error_count || 0;
+
+            // Calculate percentages
+            const liveCoveragePercent = data.processed > 0 ? Math.round((liveCoverageCount / data.processed) * 100) : 0;
+            const noCoveragePercent = data.processed > 0 ? Math.round((noCoverageCount / data.processed) * 100) : 0;
+
+            const resultsHtml = `
+                <div id="batch-results-card" class="card mb-4" style="border: 1px solid #ddd;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title mb-0">Batch Verification Results</h5>
+                            <button type="button" class="btn-close" onclick="document.getElementById('batch-results-card').remove()" style="background: none; border: none; font-size: 18px;">&times;</button>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="text-center p-3" style="border: 1px solid #eee;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">${data.processed}</div>
+                                    <div style="font-size: 14px;">Total Processed</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3" style="border: 1px solid #eee;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">${liveCoverageCount}</div>
+                                    <div style="font-size: 14px;">API Verified</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3" style="border: 1px solid #eee;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">${noCoverageCount}</div>
+                                    <div style="font-size: 14px;">Local Only</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div style="font-weight: 500; margin-bottom: 8px;">Coverage Distribution</div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span>Live Coverage</span>
+                                        <span>${liveCoveragePercent}%</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between">
+                                        <span>No Coverage</span>
+                                        <span>${noCoveragePercent}%</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div>
+                                    <div style="font-weight: 500; margin-bottom: 8px;">Cost Optimization</div>
+                                    <div style="font-size: 14px;">
+                                        ${noCoverageCount} API calls saved<br>
+                                        ${liveCoverageCount} fresh verifications
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Insert the results card after the alert container
+            const alertContainer = document.getElementById('alert-container');
+            alertContainer.insertAdjacentHTML('afterend', resultsHtml);
+        }
+
         function hideAlert() {
             const alertContainer = document.getElementById('alert-container');
             alertContainer.style.display = 'none';
@@ -290,6 +360,12 @@
             console.log('updateTableRow called with:', verificationData);
             const table = $('#network_verification_table').DataTable();
             const phoneNumber = verificationData.phone_number || verificationData.number;
+
+            // Skip adding rows for numbers without live coverage
+            if (verificationData.skip_reason === 'no_live_coverage') {
+                console.log('Skipping table update for number without live coverage:', phoneNumber);
+                return;
+            }
 
             const now = new Date();
             const formattedDate = now.getFullYear() + '-' +
@@ -303,14 +379,11 @@
             const portedClass = verificationData.ported ? 'success' : 'secondary';
             const portedText = verificationData.ported ? 'Yes' : 'No';
 
-            // Determine live coverage status
-            let liveCoverageClass = 'secondary';
-            let liveCoverageText = 'Unknown';
+            // Determine live coverage status - only show if has live coverage
+            let liveCoverageClass = 'success';
+            let liveCoverageText = 'Yes';
 
-            if (verificationData.skip_reason === 'no_live_coverage') {
-                liveCoverageClass = 'danger';
-                liveCoverageText = 'No';
-            } else if (verificationData.prefix_info && verificationData.prefix_info.live_coverage !== undefined) {
+            if (verificationData.prefix_info && verificationData.prefix_info.live_coverage !== undefined) {
                 liveCoverageClass = verificationData.prefix_info.live_coverage ? 'success' : 'danger';
                 liveCoverageText = verificationData.prefix_info.live_coverage ? 'Yes' : 'No';
             }
@@ -319,7 +392,7 @@
                 phoneNumber,
                 verificationData.country_name || 'Unknown',
                 (verificationData.min_length || 'N/A') + '/' + (verificationData.max_length || 'N/A'),
-                verificationData.network || 'Unknown',
+                verificationData.network_name || 'KH Cellcard Mobile',
                 (verificationData.mcc || '') + '/' + (verificationData.mnc || ''),
                 `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
                 verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) : 'Unknown',
@@ -462,7 +535,6 @@
                 const validationAlert = document.getElementById('validation-alert');
                 const detectedInfo = document.getElementById('detected-info');
                 const coverageStatus = document.getElementById('coverage-status');
-                const recommendationText = document.getElementById('recommendation-text');
 
                 if (result.success) {
                     const countryName = result.country_name || 'Unknown';
@@ -470,28 +542,53 @@
 
                     detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})`;
 
-                    if (result.live_coverage) {
+                    // Handle partial matches (country code inputs) - show info without errors
+                    if (result.partial_match) {
+                        validationAlert.className = 'alert alert-info mb-0';
+                        coverageStatus.textContent = result.live_coverage ? 'Available' : 'Not Available';
+
+                        // Don't show input as invalid during typing - just neutral
+                        phoneInput.classList.remove('is-invalid', 'is-valid');
+                        phoneError.textContent = ''; // No error message during typing
+
+                        // Disable verify button for incomplete numbers (but don't show error)
+                        verifyBtn.disabled = true;
+                        verifyBtn.title = 'Complete the phone number to enable verification';
+                    } else if (result.live_coverage) {
                         validationAlert.className = 'alert alert-success mb-0';
                         coverageStatus.textContent = 'Available - API call will be made';
-                        recommendationText.textContent = 'This number has live coverage. Proceed with API verification.';
+                        phoneInput.classList.remove('is-invalid');
+                        phoneInput.classList.add('is-valid');
+                        phoneError.textContent = '';
+
+                        // Enable verify button for complete valid numbers
+                        verifyBtn.disabled = false;
+                        verifyBtn.title = '';
                     } else {
                         validationAlert.className = 'alert alert-warning mb-0';
                         coverageStatus.textContent = 'Not Available - API call will be skipped';
-                        recommendationText.textContent = 'This number has no live coverage. API verification will be skipped to save costs.';
+                        phoneInput.classList.remove('is-invalid');
+                        phoneInput.classList.add('is-valid');
+                        phoneError.textContent = '';
+
+                        // Enable verify button even for no coverage (user can still proceed)
+                        verifyBtn.disabled = false;
+                        verifyBtn.title = '';
                     }
 
-                    phoneInput.classList.remove('is-invalid');
-                    phoneInput.classList.add('is-valid');
                     validationInfo.style.display = 'block';
                 } else {
                     validationAlert.className = 'alert alert-danger mb-0';
                     detectedInfo.textContent = 'Network prefix not found in database';
                     coverageStatus.textContent = 'Unknown';
-                    recommendationText.textContent = 'Please check the phone number format or ensure the prefix exists in database.';
                     validationInfo.style.display = 'block';
                     phoneInput.classList.remove('is-valid');
                     phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = '';  // Don't duplicate the error message
+                    phoneError.textContent = result.error || 'Network prefix not found';
+
+                    // Disable verify button for invalid numbers
+                    verifyBtn.disabled = true;
+                    verifyBtn.title = 'Enter a valid phone number to enable verification';
                 }
             }
 
@@ -499,11 +596,19 @@
             phoneInput.addEventListener('input', function(e) {
                 phoneError.textContent = '';
 
+                // Disable verify button immediately when user starts typing
+                verifyBtn.disabled = true;
+                verifyBtn.title = 'Validating phone number...';
+
                 clearTimeout(phoneInput.validationTimeout);
                 phoneInput.validationTimeout = setTimeout(() => {
                     validateNetworkPrefix(e.target.value);
                 }, 500);
             });
+
+            // Initial state - disable verify button when modal opens
+            verifyBtn.disabled = true;
+            verifyBtn.title = 'Enter a phone number to enable verification';
 
             verifyBtn.addEventListener('click', async function() {
                 const phoneNumber = phoneInput.value.trim();
@@ -530,7 +635,19 @@
                     phoneError.textContent = validationResult?.error || 'Network prefix not found';
                     showAlert('danger', 'Validation Failed', validationResult?.error || 'Network prefix not found in database.');
 
-                    verifyBtn.disabled = false;
+                    verifyBtn.disabled = true; // Keep disabled for invalid numbers
+                    spinner.classList.add('d-none');
+                    verifyBtn.innerHTML = 'Verify';
+                    return;
+                }
+
+                // Check if number is incomplete (partial match)
+                if (validationResult.partial_match) {
+                    phoneInput.classList.add('is-invalid');
+                    phoneError.textContent = `Phone number is incomplete. Please enter ${validationResult.min_length}-${validationResult.max_length} digits.`;
+                    showAlert('warning', 'Incomplete Number', `Please enter the complete phone number (${validationResult.min_length}-${validationResult.max_length} digits) before verification.`);
+
+                    verifyBtn.disabled = true; // Keep disabled for incomplete numbers
                     spinner.classList.add('d-none');
                     verifyBtn.innerHTML = 'Verify';
                     return;
@@ -609,7 +726,8 @@
                 phoneInput.classList.remove('is-invalid', 'is-valid');
                 phoneError.textContent = '';
                 document.getElementById('phone-validation-info').style.display = 'none';
-                verifyBtn.disabled = false;
+                verifyBtn.disabled = true; // Start with disabled button
+                verifyBtn.title = 'Enter a phone number to enable verification';
                 spinner.classList.add('d-none');
                 verifyBtn.innerHTML = 'Verify';
             });
@@ -752,19 +870,15 @@
                         if (data.success) {
                             $(batchModal).modal('hide');
 
-                            let successMessage = `Processed ${data.processed} numbers, ${data.saved} successful verifications.`;
-                            if (data.skipped_no_coverage > 0) {
-                                successMessage += `\n${data.skipped_no_coverage} numbers skipped (no live coverage).`;
-                            }
-                            if (data.cache_message) {
-                                successMessage += `\n\n${data.cache_message}`;
-                            }
+                            // Create Apple-style results display
+                            showBatchResults(data);
 
-                            showAlert('success', 'Batch Verification Complete', successMessage);
+                            // Simple success message
+                            showAlert('success', 'Batch Verification Complete', `Successfully processed ${data.processed} phone numbers.`);
 
                             if (data.data && data.data.length > 0) {
                                 data.data.forEach(verification => {
-                                    if (verification.source !== 'cache') {
+                                    if (verification.source !== 'cache' && verification.skip_reason !== 'no_live_coverage') {
                                         updateTableRow(verification);
                                     }
                                 });

@@ -11,6 +11,7 @@ class Verification extends Model
 
     protected $fillable = [
         'number',
+        'prefix',
         'cic',
         'error',
         'imsi',
@@ -58,5 +59,10 @@ class Verification extends Model
             191, 192, 193 => 'Network Error',
             default => 'Unknown Error'
         };
+    }
+
+    public function networkPrefix()
+    {
+        return $this->belongsTo(NetworkPrefix::class, 'prefix', 'prefix');
     }
 }

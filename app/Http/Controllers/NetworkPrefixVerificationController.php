@@ -24,8 +24,34 @@ class NetworkPrefixVerificationController extends Controller
      */
     public function index()
     {
-        $verifications = Verification::latest()->get();
-        $networkPrefixes = NetworkPrefix::latest()->get();
+        // Get all network prefixes for lookup
+        $allNetworkPrefixes = NetworkPrefix::all()->keyBy('prefix');
+
+        // Only show verifications that have live coverage or successful API results
+        $verifications = Verification::with('networkPrefix')
+            ->whereHas('networkPrefix', function($query) {
+                $query->where('live_coverage', true);
+            })
+            ->orWhere('status', 0) // Include successful verifications even if no network prefix relation
+            ->latest()
+            ->get();
+
+        // For verifications without networkPrefix relationship, try to find matching prefix
+        $verifications->each(function($verification) use ($allNetworkPrefixes) {
+            if (!$verification->networkPrefix) {
+                $phoneNumber = $verification->number;
+                // Try to find matching prefix by phone number
+                for ($i = 5; $i >= 3; $i--) {
+                    $prefix = substr($phoneNumber, 0, $i);
+                    if ($allNetworkPrefixes->has($prefix)) {
+                        $verification->setRelation('networkPrefix', $allNetworkPrefixes[$prefix]);
+                        break;
+                    }
+                }
+            }
+        });
+
+        $networkPrefixes = NetworkPrefix::where('live_coverage', true)->latest()->get();
 
         return view('forms.network-verification', compact('verifications', 'networkPrefixes'));
     }
@@ -115,11 +141,21 @@ class NetworkPrefixVerificationController extends Controller
         $results = $batchResult['results'];
         $statistics = $batchResult['statistics'];
 
-        // Separate successful results for saving
+        // Separate results by type
         $savedResults = [];
+        $liveCoverageResults = [];
+        $noCoverageResults = [];
+        $errorResults = [];
+
         foreach ($results as $result) {
-            if ($result['success'] || (isset($result['skip_reason']) && $result['skip_reason'] === 'no_live_coverage')) {
+            if ($result['success']) {
                 $savedResults[] = $result;
+                $liveCoverageResults[] = $result;
+            } elseif (isset($result['skip_reason']) && $result['skip_reason'] === 'no_live_coverage') {
+                $savedResults[] = $result;
+                $noCoverageResults[] = $result;
+            } else {
+                $errorResults[] = $result;
             }
         }
 
@@ -135,16 +171,25 @@ class NetworkPrefixVerificationController extends Controller
             'success' => true,
             'processed' => $statistics['total_numbers'],
             'saved' => count($savedResults),
+            'live_coverage_count' => count($liveCoverageResults),
+            'no_coverage_count' => count($noCoverageResults),
+            'error_count' => count($errorResults),
             'skipped_no_coverage' => $statistics['skipped_no_coverage'],
             'statistics' => [
                 'cache_hits' => $statistics['cache_hits'],
                 'database_hits' => $statistics['database_hits'],
                 'api_calls' => $statistics['api_calls'],
                 'skipped_no_coverage' => $statistics['skipped_no_coverage'],
-                'total_cached' => $statistics['cache_hits'] + $statistics['database_hits']
+                'total_cached' => $statistics['cache_hits'] + $statistics['database_hits'],
+                'live_coverage_results' => count($liveCoverageResults),
+                'no_coverage_results' => count($noCoverageResults),
+                'error_results' => count($errorResults)
             ],
             'cache_message' => $this->buildCacheMsg($statistics),
-            'data' => $savedResults
+            'data' => $savedResults,
+            'live_coverage_data' => $liveCoverageResults,
+            'no_coverage_data' => $noCoverageResults,
+            'error_data' => $errorResults
         ]);
     }
 

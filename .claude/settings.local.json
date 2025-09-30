@@ -7,7 +7,9 @@
       "Bash(curl:*)",
       "Bash(php:*)",
       "Bash(xargs:*)",
-      "Read(//home/smith/Pictures/Screenshots/**)"
+      "Read(//home/smith/Pictures/Screenshots/**)",
+      "Bash(mysql:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": []

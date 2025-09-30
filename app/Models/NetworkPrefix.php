@@ -18,4 +18,13 @@ class NetworkPrefix extends Model
         "created_at",
         "updated_at",
     ];
+
+    protected $casts = [
+        'live_coverage' => 'boolean',
+    ];
+
+    public function verifications()
+    {
+        return $this->hasMany(Verification::class, 'prefix', 'prefix');
+    }
 }

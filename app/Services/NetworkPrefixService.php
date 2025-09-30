@@ -43,6 +43,7 @@ class NetworkPrefixService
             $maxPrefixLength = 6; // Adjust based on your data
             $networkInfo = null;
 
+            // First, try to find exact prefix match for complete numbers (with length validation)
             for ($i = $maxPrefixLength; $i >= 2; $i--) {
                 $prefix = substr($cleanNumber, 0, $i);
 
@@ -53,6 +54,132 @@ class NetworkPrefixService
 
                 if ($networkInfo) {
                     break;
+                }
+            }
+
+            // If no exact match with length validation, try to find prefix match for partial numbers
+            if (!$networkInfo) {
+                for ($i = $maxPrefixLength; $i >= 2; $i--) {
+                    $prefix = substr($cleanNumber, 0, $i);
+
+                    $networkInfo = NetworkPrefix::where('prefix', $prefix)->first();
+
+                    if ($networkInfo) {
+                        // Found a matching prefix, but need to check if this is a valid partial number
+                        // If the input is longer than the prefix but shorter than expected, it's partial
+                        if (strlen($cleanNumber) > strlen($prefix) && strlen($cleanNumber) < $networkInfo->min_length) {
+                            return [
+                                'success' => true,
+                                'phone_number' => $cleanNumber,
+                                'prefix' => $networkInfo->prefix,
+                                'country_name' => $networkInfo->country_name,
+                                'network_name' => $networkInfo->network_name,
+                                'mcc' => $networkInfo->mcc,
+                                'mnc' => $networkInfo->mnc,
+                                'live_coverage' => $networkInfo->live_coverage,
+                                'min_length' => $networkInfo->min_length,
+                                'max_length' => $networkInfo->max_length,
+                                'partial_match' => true,
+                                'expected_format' => ''
+                            ];
+                        }
+                        break;
+                    }
+                }
+            }
+
+            // If no exact match found and input is shorter than expected, try progressive prefix matching
+            if (!$networkInfo && strlen($cleanNumber) < 8) {
+                // For partial inputs, check if any existing prefix starts with this input
+                $matchingPrefixes = NetworkPrefix::where('prefix', 'LIKE', $cleanNumber . '%')
+                    ->orderBy('prefix', 'asc')
+                    ->get();
+
+                if ($matchingPrefixes->isNotEmpty()) {
+                    // Check if the input exactly matches any existing prefix
+                    $exactMatch = $matchingPrefixes->where('prefix', $cleanNumber)->first();
+
+                    if ($exactMatch) {
+                        // Input exactly matches a prefix - show full network info
+                        $networkInfo = $exactMatch;
+
+                        return [
+                            'success' => true,
+                            'phone_number' => $cleanNumber,
+                            'prefix' => $networkInfo->prefix,
+                            'country_name' => $networkInfo->country_name,
+                            'network_name' => $networkInfo->network_name,
+                            'mcc' => $networkInfo->mcc,
+                            'mnc' => $networkInfo->mnc,
+                            'live_coverage' => $networkInfo->live_coverage,
+                            'min_length' => $networkInfo->min_length,
+                            'max_length' => $networkInfo->max_length,
+                            'partial_match' => true,
+                            'expected_format' => ''
+                        ];
+                    } else {
+                        // Check if any prefix actually starts with this input
+                        $validPrefixFound = false;
+                        $firstMatch = null;
+
+                        foreach ($matchingPrefixes as $prefix) {
+                            if (substr($prefix->prefix, 0, strlen($cleanNumber)) === $cleanNumber) {
+                                if (!$firstMatch) {
+                                    $firstMatch = $prefix;
+                                }
+                                $validPrefixFound = true;
+                            }
+                        }
+
+                        if (!$validPrefixFound) {
+                            return [
+                                'success' => false,
+                                'error' => 'No network prefix found starting with "' . $cleanNumber . '"',
+                                'phone_number' => $cleanNumber
+                            ];
+                        }
+
+                        // For short inputs (country code level), show generic country info
+                        if (strlen($cleanNumber) <= 4) {
+                            return [
+                                'success' => true,
+                                'phone_number' => $cleanNumber,
+                                'prefix' => 'Multiple',
+                                'country_name' => $firstMatch->country_name,
+                                'network_name' => 'Multiple Networks Available',
+                                'mcc' => $firstMatch->mcc,
+                                'mnc' => 'XX',
+                                'live_coverage' => true, // Assume at least one has coverage
+                                'min_length' => $firstMatch->min_length,
+                                'max_length' => $firstMatch->max_length,
+                                'partial_match' => true,
+                                'expected_format' => ''
+                            ];
+                        } else {
+                            // For longer inputs, show specific network
+                            return [
+                                'success' => true,
+                                'phone_number' => $cleanNumber,
+                                'prefix' => $firstMatch->prefix,
+                                'country_name' => $firstMatch->country_name,
+                                'network_name' => $firstMatch->network_name,
+                                'mcc' => $firstMatch->mcc,
+                                'mnc' => $firstMatch->mnc,
+                                'live_coverage' => $firstMatch->live_coverage,
+                                'min_length' => $firstMatch->min_length,
+                                'max_length' => $firstMatch->max_length,
+                                'partial_match' => true,
+                                'expected_format' => ''
+                            ];
+                        }
+                    }
+                } else {
+                    // No prefixes found that start with this input
+                    return [
+                        'success' => false,
+                        'error' => 'No network prefix found starting with "' . $cleanNumber . '"',
+                        'phone_number' => $cleanNumber
+                    ];
                 }
             }
 
@@ -410,9 +537,26 @@ class NetworkPrefixService
     private function saveResult(array $resultData)
     {
         try {
+            // Prepare data for Verification model - only store prefix for relationship
+            $verificationData = [
+                'cic' => $resultData['cic'] ?? null,
+                'error' => $resultData['error'] ?? 0,
+                'imsi' => $resultData['imsi'] ?? null,
+                'mcc' => $resultData['mcc'] ?? null,
+                'mnc' => $resultData['mnc'] ?? null,
+                'network' => $resultData['network'] ?? null,
+                'ported' => $resultData['ported'] ?? false,
+                'present' => $resultData['present'] ?? null,
+                'status' => $resultData['status'] ?? 0,
+                'status_message' => $resultData['status_message'] ?? null,
+                'type' => $resultData['type'] ?? null,
+                'trxid' => $resultData['trxid'] ?? null,
+                'prefix' => $resultData['prefix'] ?? null,
+            ];
+
             $verification = Verification::updateOrCreate(
                 ['number' => $resultData['number']],
-                $resultData
+                $verificationData
             );
 
             $cacheKey = 'phone_verification:' . $resultData['number'];
