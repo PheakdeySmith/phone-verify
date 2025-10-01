@@ -4,38 +4,97 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Verification;
+use App\Models\NetworkPrefix;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Cache;
-use App\Services\TmtVerificationService;
+use App\Services\VerificationService;
 use App\Exports\VerificationExport;
 
 class VerificationController extends Controller
 {
     private $verificationService;
 
-    public function __construct(TmtVerificationService $verificationService)
+    public function __construct(VerificationService $verificationService)
     {
         $this->verificationService = $verificationService;
     }
 
+    /**
+     * Display the network prefix verification page
+     */
+    public function index()
+    {
+        // Get all network prefixes for lookup
+        $allNetworkPrefixes = NetworkPrefix::all()->keyBy('prefix');
+
+        // Only show verifications that have live coverage or successful API results
+        $verifications = Verification::with('networkPrefix')
+            ->whereHas('networkPrefix', function($query) {
+                $query->where('live_coverage', true);
+            })
+            ->orWhere('status', 0) // Include successful verifications even if no network prefix relation
+            ->latest()
+            ->get();
+
+        // For verifications without networkPrefix relationship, try to find matching prefix
+        $verifications->each(function($verification) use ($allNetworkPrefixes) {
+            if (!$verification->networkPrefix) {
+                $phoneNumber = $verification->number;
+                // Try to find matching prefix by phone number
+                for ($i = 5; $i >= 3; $i--) {
+                    $prefix = substr($phoneNumber, 0, $i);
+                    if ($allNetworkPrefixes->has($prefix)) {
+                        $verification->setRelation('networkPrefix', $allNetworkPrefixes[$prefix]);
+                        break;
+                    }
+                }
+            }
+        });
+
+        $networkPrefixes = NetworkPrefix::where('live_coverage', true)->latest()->get();
+
+        return view('forms.network-verification', compact('verifications', 'networkPrefixes'));
+    }
+
+    /**
+     * Check network prefix for a phone number
+     */
+    public function checkNetworkPrefix(Request $request)
+    {
+        $request->validate([
+            'phone_number' => 'required|string',
+        ]);
+
+        $phoneNumber = $request->phone_number;
+        $result = $this->verificationService->checkNetworkPrefix($phoneNumber);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Verify a single phone number using network prefix service
+     */
     public function verify(Request $request)
     {
         $request->validate([
-        'phone_number' => 'required|string',
-        'data_freshness' => 'nullable|string',
-        'validation_info' => 'nullable|array'
-    ]);
+            'phone_number' => 'required|string',
+            'data_freshness' => 'nullable|string',
+        ]);
 
-    $phoneNumber = $request->phone_number;
-    $dataFreshness = $request->data_freshness;
-    $validationInfo = $request->validation_info;
+        $phoneNumber = $request->phone_number;
+        $dataFreshness = $request->data_freshness;
 
-    // Check if phone number has live coverage based on validation
-    if ($validationInfo && !$validationInfo['live_coverage']) {
-        \Log::info("Phone number {$phoneNumber} has no live coverage, proceeding with limited verification");
-    }
+        \Log::info('NetworkPrefixVerificationController@verify called', [
+            'phone' => $phoneNumber,
+            'data_freshness' => $dataFreshness
+        ]);
 
-    $result = $this->verificationService->verifyNumber($phoneNumber, $dataFreshness, $validationInfo);
+        $result = $this->verificationService->verifyNumber($phoneNumber, $dataFreshness);
+
+        \Log::info('VerificationService result', [
+            'phone' => $phoneNumber,
+            'result' => $result
+        ]);
 
         // If result is cached, return it directly
         if (isset($result['cached']) && $result['cached']) {
@@ -46,21 +105,34 @@ class VerificationController extends Controller
             ]);
         }
 
-        if ($result['success']) {
+        if ($result['success'] || $result['skip_reason'] === 'no_live_coverage') {
             // Track verification stats in Cache
-            $this->incrementStat('verification_stats:total');
-            $this->incrementStat('verification_stats:successful');
-            $this->incrementStat('verification_stats:today:' . now()->format('Y-m-d'));
+            $this->incrementStat('network_verification_stats:total');
 
-            return response()->json([
+            if ($result['success']) {
+                $this->incrementStat('network_verification_stats:successful');
+            } else {
+                $this->incrementStat('network_verification_stats:skipped_no_coverage');
+            }
+
+            $this->incrementStat('network_verification_stats:today:' . now()->format('Y-m-d'));
+
+            $response = [
                 'success' => true,
                 'data' => $result
+            ];
+
+            \Log::info('Returning success response', [
+                'phone' => $phoneNumber,
+                'response' => $response
             ]);
+
+            return response()->json($response);
         }
 
         // Track failed verification
-        $this->incrementStat('verification_stats:total');
-        $this->incrementStat('verification_stats:failed');
+        $this->incrementStat('network_verification_stats:total');
+        $this->incrementStat('network_verification_stats:failed');
 
         return response()->json([
             'success' => false,
@@ -68,86 +140,98 @@ class VerificationController extends Controller
         ], 400);
     }
 
+    /**
+     * Verify multiple phone numbers using network prefix service
+     */
     public function verifyBatch(Request $request)
-{
-    $request->validate([
-        'phone_numbers' => 'required|array',
-        'phone_numbers.*' => 'required|string',
-        'data_freshness' => 'nullable|string|in:30,60,90,all' // Add validation
-    ]);
+    {
+        $request->validate([
+            'phone_numbers' => 'required|array',
+            'phone_numbers.*' => 'required|string',
+            'data_freshness' => 'nullable|string|in:30,60,90,all'
+        ]);
 
-    $phoneNumbers = $request->phone_numbers;
-    $dataFreshness = $request->data_freshness; // Get the parameter
+        $phoneNumbers = $request->phone_numbers;
+        $dataFreshness = $request->data_freshness;
 
-    // Pass the data_freshness parameter to the batch verification
-    $batchResult = $this->verificationService->verifyBatch($phoneNumbers, $dataFreshness);
-    $results = $batchResult['results'];
-    $statistics = $batchResult['statistics'];
+        $batchResult = $this->verificationService->verifyBatch($phoneNumbers, $dataFreshness);
+        $results = $batchResult['results'];
+        $statistics = $batchResult['statistics'];
 
-    // Separate successful results for saving
-    $savedResults = [];
-    foreach ($results as $result) {
-        if ($result['success']) {
-            $savedResults[] = $result;
+        // Separate results by type
+        $savedResults = [];
+        $liveCoverageResults = [];
+        $noCoverageResults = [];
+        $errorResults = [];
+
+        foreach ($results as $result) {
+            if ($result['success']) {
+                $savedResults[] = $result;
+                $liveCoverageResults[] = $result;
+            } elseif (isset($result['skip_reason']) && $result['skip_reason'] === 'no_live_coverage') {
+                $savedResults[] = $result;
+                $noCoverageResults[] = $result;
+            } else {
+                $errorResults[] = $result;
+            }
         }
+
+        // Update batch verification stats
+        $this->incrementStat('network_verification_stats:batch_total');
+        $this->addToStat('network_verification_stats:batch_numbers', $statistics['total_numbers']);
+        $this->addToStat('network_verification_stats:cached_hits', $statistics['cache_hits']);
+        $this->addToStat('network_verification_stats:database_hits', $statistics['database_hits']);
+        $this->addToStat('network_verification_stats:api_calls', $statistics['api_calls']);
+        $this->addToStat('network_verification_stats:skipped_no_coverage', $statistics['skipped_no_coverage']);
+
+        return response()->json([
+            'success' => true,
+            'processed' => $statistics['total_numbers'],
+            'saved' => count($savedResults),
+            'live_coverage_count' => count($liveCoverageResults),
+            'no_coverage_count' => count($noCoverageResults),
+            'error_count' => count($errorResults),
+            'skipped_no_coverage' => $statistics['skipped_no_coverage'],
+            'statistics' => [
+                'cache_hits' => $statistics['cache_hits'],
+                'database_hits' => $statistics['database_hits'],
+                'api_calls' => $statistics['api_calls'],
+                'skipped_no_coverage' => $statistics['skipped_no_coverage'],
+                'total_cached' => $statistics['cache_hits'] + $statistics['database_hits'],
+                'live_coverage_results' => count($liveCoverageResults),
+                'no_coverage_results' => count($noCoverageResults),
+                'error_results' => count($errorResults)
+            ],
+            'cache_message' => $this->buildCacheMsg($statistics),
+            'data' => $savedResults,
+            'live_coverage_data' => $liveCoverageResults,
+            'no_coverage_data' => $noCoverageResults,
+            'error_data' => $errorResults
+        ]);
     }
 
-    // Update batch verification stats
-    $this->incrementStat('verification_stats:batch_total');
-    $this->addToStat('verification_stats:batch_numbers', $statistics['total_numbers']);
-    $this->addToStat('verification_stats:cached_hits', $statistics['cache_hits']);
-    $this->addToStat('verification_stats:database_hits', $statistics['database_hits']);
-    $this->addToStat('verification_stats:api_calls', $statistics['api_calls']);
-
-    return response()->json([
-        'success' => true,
-        'processed' => $statistics['total_numbers'],
-        'saved' => count($savedResults),
-        'statistics' => [
-            'cache_hits' => $statistics['cache_hits'],
-            'database_hits' => $statistics['database_hits'],
-            'api_calls' => $statistics['api_calls'],
-            'total_cached' => $statistics['cache_hits'] + $statistics['database_hits']
-        ],
-        'cache_message' => $this->buildCacheMsg($statistics),
-        'data' => $savedResults
-    ]);
-}
-
+    /**
+     * Export verification results
+     */
     public function export()
     {
-        return Excel::download(new VerificationExport, 'verification-results.xlsx');
+        return Excel::download(new VerificationExport, 'network-verification-results.xlsx');
     }
 
-    public function index()
-    {
-        $verifications=  Verification::latest()->get();
-
-        return view('forms.verify', compact('verifications'));
-    }
-
-    public function results()
-    {
-        $page = request()->get('page', 1);
-        $cacheKey = 'verification_results_paginated:' . $page;
-
-        $results = Cache::remember($cacheKey, 300, function () {
-            return Verification::latest()->paginate(50);
-        });
-
-        return response()->json($results);
-    }
-
+    /**
+     * Get verification statistics
+     */
     public function stats()
     {
         $stats = [
-            'total_verifications' => $this->getStat('verification_stats:total'),
-            'successful' => $this->getStat('verification_stats:successful'),
-            'failed' => $this->getStat('verification_stats:failed'),
-            'batch_total' => $this->getStat('verification_stats:batch_total'),
-            'batch_numbers' => $this->getStat('verification_stats:batch_numbers'),
-            'cached_hits' => $this->getStat('verification_stats:cached_hits'),
-            'today' => $this->getStat('verification_stats:today:' . now()->format('Y-m-d')),
+            'total_verifications' => $this->getStat('network_verification_stats:total'),
+            'successful' => $this->getStat('network_verification_stats:successful'),
+            'failed' => $this->getStat('network_verification_stats:failed'),
+            'skipped_no_coverage' => $this->getStat('network_verification_stats:skipped_no_coverage'),
+            'batch_total' => $this->getStat('network_verification_stats:batch_total'),
+            'batch_numbers' => $this->getStat('network_verification_stats:batch_numbers'),
+            'cached_hits' => $this->getStat('network_verification_stats:cached_hits'),
+            'today' => $this->getStat('network_verification_stats:today:' . now()->format('Y-m-d')),
         ];
 
         return response()->json($stats);
@@ -176,11 +260,13 @@ class VerificationController extends Controller
         $cacheHits = $statistics['cache_hits'];
         $dbHits = $statistics['database_hits'];
         $apiCalls = $statistics['api_calls'];
+        $skippedNoCoverage = $statistics['skipped_no_coverage'];
         $totalCached = $cacheHits + $dbHits;
 
-        $message = "Cache Performance: ";
-        $message .= "{$totalCached} numbers found in cache ({$cacheHits} from Redis cache, {$dbHits} from database), ";
-        $message .= "{$apiCalls} new API calls made";
+        $message = "Performance: ";
+        $message .= "{$totalCached} numbers found in cache ({$cacheHits} from Redis, {$dbHits} from database), ";
+        $message .= "{$apiCalls} new API calls made, ";
+        $message .= "{$skippedNoCoverage} skipped (no live coverage)";
 
         if ($total > 0) {
             $cachePercentage = round(($totalCached / $total) * 100, 1);

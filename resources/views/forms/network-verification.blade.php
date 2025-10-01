@@ -7,12 +7,25 @@
 @endsection
 
 @section('main-content')
-    <div class="breadcrumb">
-        <h1>Network Prefix Verification</h1>
-        <ul>
-            <li><a href="">Form</a></li>
-            <li>Smart Phone Verification</li>
-        </ul>
+    <div class="breadcrumb d-flex justify-content-between align-items-center">
+        <div>
+            <h1>Phone Number</h1>
+            <ul class="mb-0">
+                <li><a href="">Form</a></li>
+                <li>Verification</li>
+            </ul>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#filterModal" id="filterBtn">
+                <i class="nav-icon me-2 i-Filter-2"></i> <span id="filterCount" class="badge badge-light d-none">0</span>
+            </button>
+            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#verify">
+                <i class="fas fa-plus"></i> Enter Number
+            </button>
+            <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#upload">
+                <i class="fas fa-upload"></i> Import Files
+            </button>
+        </div>
     </div>
 
     <div class="separator-breadcrumb border-top"></div>
@@ -25,26 +38,16 @@
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="card-title">Actions</div>
-                <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#verify">
-                    Enter Number
-                </button>
-                <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#upload">
-                    Import Files
-                </button>
-            </div>
-        </div>
-    </div>
-
     <div class="row">
-        <div class="col-md-12 mb-4">
-            <div class="card text-start">
+        <div class="col-md-12">
+            <div class="card">
                 <div class="card-body">
-                    <h4 class="card-title mb-3">Network Prefix Verification Table</h4>
-                    <a href="{{ route('verification.export') }}" class="btn btn-secondary mb-3">Export to Excel</a>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h4 class="card-title mb-0"><i class="fas fa-table"></i> Network Prefix Verification Table</h4>
+                        <a href="{{ route('verification.export') }}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-download"></i> Export to Excel
+                        </a>
+                    </div>
                     <div class="table-responsive">
                         <table id="network_verification_table" class="display table table-striped table-bordered"
                             style="width:100%">
@@ -69,7 +72,7 @@
                                     <tr data-phone="{{ $verification->number }}">
                                         <td>{{ $verification->number }}</td>
                                         <td>{{ $verification->networkPrefix?->country_name ?? 'Unknown' }}</td>
-                                        <td>{{ ($verification->networkPrefix?->min_length ?? 'N/A') }}/{{ ($verification->networkPrefix?->max_length ?? 'N/A') }}</td>
+                                        <td>{{ $verification->networkPrefix?->min_length ?? 'N/A' }}/{{ $verification->networkPrefix?->max_length ?? 'N/A' }}</td>
                                         <td>{{ $verification->networkPrefix?->network_name ?? 'Unknown' }}</td>
                                         <td>{{ $verification->mcc }}/{{ $verification->mnc }}</td>
                                         <td>
@@ -106,7 +109,7 @@
                                                 if ($present === 'yes') {
                                                     $presentClass = 'success';
                                                 } elseif ($present === 'no') {
-                                                    $presentClass = 'danger';
+                                                    $presentClass = 'secondary';
                                                 } elseif ($present === 'na') {
                                                     $presentClass = 'secondary';
                                                 }
@@ -214,9 +217,12 @@
                             <option value="30">Force refresh if data is older than 30 days</option>
                             <option value="60">Force refresh if data is older than 60 days</option>
                             <option value="90">Force refresh if data is older than 90 days</option>
-                            <option value="all">Always get fresh data from API</option>
+                            <option value="all">Verify All Fresh (bypass cache & database)</option>
                         </select>
-                        <div class="form-text">Select when to fetch fresh data from the API vs using cached results</div>
+                        <div class="form-text">
+                            <strong>Fresh Verification:</strong> Numbers with live coverage will be verified with fresh API calls.
+                            Numbers without live coverage will be skipped to save costs and only checked against local database.
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -280,13 +286,19 @@
                 existingCard.remove();
             }
 
+            const stats = data.statistics || {};
             const liveCoverageCount = data.live_coverage_count || 0;
             const noCoverageCount = data.no_coverage_count || 0;
             const errorCount = data.error_count || 0;
+            const cacheHits = stats.cache_hits || 0;
+            const dbHits = stats.database_hits || 0;
+            const apiCalls = stats.api_calls || 0;
+            const totalCached = cacheHits + dbHits;
 
             // Calculate percentages
             const liveCoveragePercent = data.processed > 0 ? Math.round((liveCoverageCount / data.processed) * 100) : 0;
             const noCoveragePercent = data.processed > 0 ? Math.round((noCoverageCount / data.processed) * 100) : 0;
+            const cachePercent = data.processed > 0 ? Math.round((totalCached / data.processed) * 100) : 0;
 
             const resultsHtml = `
                 <div id="batch-results-card" class="card mb-4" style="border: 1px solid #ddd;">
@@ -296,51 +308,97 @@
                             <button type="button" class="btn-close" onclick="document.getElementById('batch-results-card').remove()" style="background: none; border: none; font-size: 18px;">&times;</button>
                         </div>
 
+                        <!-- Main Statistics Row -->
                         <div class="row mb-3">
-                            <div class="col-md-4">
-                                <div class="text-center p-3" style="border: 1px solid #eee;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">${data.processed}</div>
-                                    <div style="font-size: 14px;">Total Processed</div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #333;">${data.processed}</div>
+                                    <div style="font-size: 14px; color: #666;">Total Processed</div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="text-center p-3" style="border: 1px solid #eee;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">${liveCoverageCount}</div>
-                                    <div style="font-size: 14px;">API Verified</div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #28a745;">${liveCoverageCount}</div>
+                                    <div style="font-size: 14px; color: #666;">Live Coverage</div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
-                                <div class="text-center p-3" style="border: 1px solid #eee;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">${noCoverageCount}</div>
-                                    <div style="font-size: 14px;">Local Only</div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #ffc107;">${noCoverageCount}</div>
+                                    <div style="font-size: 14px; color: #666;">No Coverage</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: ${errorCount > 0 ? '#dc3545' : '#6c757d'};">${errorCount}</div>
+                                    <div style="font-size: 14px; color: #666;">Errors</div>
                                 </div>
                             </div>
                         </div>
 
+                        <!-- Data Source Statistics -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #007bff;">${totalCached}</div>
+                                    <div style="font-size: 14px; color: #666;">From Cache/DB</div>
+                                    <div style="font-size: 12px; color: #999;">${cachePercent}% cache hit</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #17a2b8;">${cacheHits}</div>
+                                    <div style="font-size: 14px; color: #666;">Redis Cache</div>
+                                    <div style="font-size: 12px; color: #999;">Fast retrieval</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #6f42c1;">${dbHits}</div>
+                                    <div style="font-size: 14px; color: #666;">Database</div>
+                                    <div style="font-size: 12px; color: #999;">Historical data</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API Calls and Performance -->
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <div style="font-weight: 500; margin-bottom: 8px;">Coverage Distribution</div>
+                                    <div style="font-weight: 500; margin-bottom: 8px; color: #333;">API Performance</div>
                                     <div class="d-flex justify-content-between mb-1">
-                                        <span>Live Coverage</span>
-                                        <span>${liveCoveragePercent}%</span>
+                                        <span style="color: #666;">New API Calls:</span>
+                                        <span style="font-weight: 500; color: #333;">${apiCalls}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <span style="color: #666;">Cache Hit Rate:</span>
+                                        <span style="font-weight: 500; color: #333;">${cachePercent}%</span>
                                     </div>
                                     <div class="d-flex justify-content-between">
-                                        <span>No Coverage</span>
-                                        <span>${noCoveragePercent}%</span>
+                                        <span style="color: #666;">Coverage Rate:</span>
+                                        <span style="font-weight: 500; color: #333;">${liveCoveragePercent}%</span>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div>
-                                    <div style="font-weight: 500; margin-bottom: 8px;">Cost Optimization</div>
-                                    <div style="font-size: 14px;">
-                                        ${noCoverageCount} API calls saved<br>
-                                        ${liveCoverageCount} fresh verifications
+                                    <div style="font-weight: 500; margin-bottom: 8px; color: #333;">Cost Optimization</div>
+                                    <div style="font-size: 14px; color: #666;">
+                                        <div class="mb-1">${noCoverageCount} API calls saved (no coverage)</div>
+                                        <div class="mb-1">${totalCached} cached results reused</div>
+                                        <div>${apiCalls} fresh verifications made</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+
+                        ${data.cache_message ? `
+                        <div class="mt-3 pt-3" style="border-top: 1px solid #eee;">
+                            <div style="font-size: 13px; color: #666; font-style: italic;">
+                                ${data.cache_message}
+                            </div>
+                        </div>
+                        ` : ''}
                     </div>
                 </div>
             `;
@@ -410,7 +468,7 @@
                     if (present === 'yes') {
                         presentClass = 'success';
                     } else if (present === 'no') {
-                        presentClass = 'danger';
+                        presentClass = 'secondary';
                     }
 
                     return `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`;
@@ -447,6 +505,7 @@
                 console.log('New row added successfully');
             }
         }
+
 
         // Highlight existing row for cached data
         function highlightRow(phoneNumber) {
@@ -507,7 +566,7 @@
                 }
 
                 try {
-                    const response = await fetch('/network-prefix/check', {
+                    const response = await fetch('/verification/check', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -578,7 +637,7 @@
 
                     validationInfo.style.display = 'block';
                 } else {
-                    validationAlert.className = 'alert alert-danger mb-0';
+                    validationAlert.className = 'alert alert-secondary mb-0';
                     detectedInfo.textContent = 'Network prefix not found in database';
                     coverageStatus.textContent = 'Unknown';
                     validationInfo.style.display = 'block';
@@ -653,26 +712,11 @@
                     return;
                 }
 
-                // Check if phone has live coverage
-                if (!validationResult.live_coverage) {
-                    const proceed = confirm(
-                        'This phone number has no live coverage according to our network prefix database. ' +
-                        'API verification will be skipped to save costs. ' +
-                        'Do you want to proceed with local validation only?'
-                    );
-
-                    if (!proceed) {
-                        verifyBtn.disabled = false;
-                        spinner.classList.add('d-none');
-                        verifyBtn.innerHTML = 'Verify';
-                        return;
-                    }
-                }
 
                 verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                // Make API call to new network prefix service
-                fetch('{{ route("network-prefix.verify") }}', {
+                // Make API call to new verification service
+                fetch('{{ route("verification.verify") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -684,8 +728,16 @@
                             data_freshness: dataFreshness
                         })
                     })
-                    .then(response => response.json())
+                    .then(response => {
+                        console.log('Raw response status:', response.status);
+                        console.log('Raw response ok:', response.ok);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        console.log('Parsed response data:', data);
                         if (data.success) {
                             $(modal).modal('hide');
 
@@ -707,10 +759,12 @@
                         }
                     })
                     .catch(error => {
-                        console.error('Error:', error);
+                        console.error('Detailed error information:', error);
+                        console.error('Error message:', error.message);
+                        console.error('Error stack:', error.stack);
                         phoneInput.classList.add('is-invalid');
                         phoneError.textContent = 'Network error. Please try again.';
-                        showAlert('danger', 'Error', 'Network error occurred. Please try again.');
+                        showAlert('danger', 'Error', 'Network error occurred. Please try again. Check console for details.');
                     })
                     .finally(() => {
                         verifyBtn.disabled = false;
@@ -854,7 +908,7 @@
                 batchSpinner.classList.remove('d-none');
                 batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                fetch('{{ route("network-prefix.batch") }}', {
+                fetch('{{ route("verification.batch") }}', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -916,3 +970,99 @@
         });
     </script>
 @endsection
+
+<!-- Filter Modal - YouTube Style -->
+<div class="modal fade" id="filterModal" tabindex="-1" role="dialog" aria-labelledby="filterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-md" role="document">
+        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 4px 24px rgba(0,0,0,0.15);">
+            <div class="modal-header border-0 px-4 pt-4 pb-2">
+                <h5 class="modal-title" id="filterModalLabel" style="font-weight: 500; color: #333;">
+                    Filter Results
+                </h5>
+            </div>
+            <div class="modal-body px-4 py-2">
+                <div id="modal-filters">
+                    <!-- Coverage Category -->
+                    <div class="filter-category mb-4">
+                        <h6 class="filter-category-title" style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Coverage
+                        </h6>
+                        <div class="filter-options">
+                            <select id="modal-coverage-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                <option value="">All Coverage Types</option>
+                                <option value="Yes">Live Coverage</option>
+                                <option value="No">No Coverage</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Connection Category -->
+                    <div class="filter-category mb-4">
+                        <h6 class="filter-category-title" style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Connection
+                        </h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <select id="modal-type-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                    <option value="">All Types</option>
+                                    <option value="Mobile">Mobile</option>
+                                    <option value="Fixed">Fixed</option>
+                                    <option value="Unknown">Unknown</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select id="modal-ported-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                    <option value="">All Porting</option>
+                                    <option value="Yes">Ported</option>
+                                    <option value="No">Not Ported</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Category -->
+                    <div class="filter-category mb-4">
+                        <h6 class="filter-category-title" style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                            Status
+                        </h6>
+                        <div class="row">
+                            <div class="col-6">
+                                <select id="modal-status-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                    <option value="">All Status</option>
+                                    <option value="Success">Success</option>
+                                    <option value="Failed">Failed</option>
+                                    <option value="No Live Coverage">No Coverage</option>
+                                    <option value="Error">Error</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select id="modal-present-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                    <option value="">All Presence</option>
+                                    <option value="Yes">Present</option>
+                                    <option value="No">Not Present</option>
+                                    <option value="Na">N/A</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Filters Preview -->
+                <div class="mt-3 pt-3" style="border-top: 1px solid #f0f0f0;">
+                    <div class="d-flex align-items-center">
+                        <small class="text-muted me-2" style="font-size: 12px;">Active filters:</small>
+                        <small id="activeFiltersText" class="text-dark" style="font-size: 12px;">None</small>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearAllFilters">
+                    Clear All
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" id="applyFilters">
+                    Apply Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

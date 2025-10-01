@@ -26,8 +26,8 @@
                                 <ul>
 
                                     <li class="nav-item">
-                                        <a class="{{ Route::currentRouteName() == 'verify' ? 'open' : '' }}"
-                                            href="{{ route('verify') }}">
+                                        <a class="{{ Route::currentRouteName() == 'verification.index' ? 'open' : '' }}"
+                                            href="{{ route('verification.index') }}">
                                             <i class="nav-icon me-2 i-File-Clipboard-Text--Image"></i>
                                             <span class="item-name">Verify</span>
                                         </a>

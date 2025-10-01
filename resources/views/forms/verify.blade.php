@@ -25,16 +25,80 @@
         </div>
     </div>
 
-    <div class="col-md-3">
-        <div class="card mb-4">
-            <div class="card-body">
-                <div class="card-title">Actions</div>
-                <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#verify">
-                    Enter Number
-                </button>
-                <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#upload">
-                    Import Files
-                </button>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="card-title">Actions</div>
+                    <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#verify">
+                        Enter Number
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#upload">
+                        Import Files
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-body">
+                    <div class="card-title">Filters</div>
+                    <div class="row" id="verify-table-filters">
+                        <div class="col-md-3">
+                            <label class="form-label text-muted small">Network</label>
+                            <select id="verify-network-filter" class="form-control form-control-sm">
+                                <option value="">All Networks</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label text-muted small">MCC/MNC</label>
+                            <select id="verify-mcc-filter" class="form-control form-control-sm">
+                                <option value="">All MCC/MNC</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label text-muted small">Type</label>
+                            <select id="verify-type-filter" class="form-control form-control-sm">
+                                <option value="">All</option>
+                                <option value="Mobile">Mobile</option>
+                                <option value="Fixed">Fixed</option>
+                                <option value="Unknown">Unknown</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label text-muted small">Status</label>
+                            <select id="verify-status-filter" class="form-control form-control-sm">
+                                <option value="">All</option>
+                                <option value="Success">Success</option>
+                                <option value="Failed">Failed</option>
+                                <option value="No Live Coverage">No Coverage</option>
+                                <option value="Error">Error</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label text-muted small">Ported</label>
+                            <select id="verify-ported-filter" class="form-control form-control-sm">
+                                <option value="">All</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                            </select>
+                        </div>
+                        <div class="col-md-1">
+                            <label class="form-label text-muted small">Present</label>
+                            <select id="verify-present-filter" class="form-control form-control-sm">
+                                <option value="">All</option>
+                                <option value="Yes">Yes</option>
+                                <option value="No">No</option>
+                                <option value="Na">Na</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-muted small">&nbsp;</label>
+                            <button id="verify-clear-filters" class="btn btn-outline-secondary btn-sm d-block">Clear Filters</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
