@@ -7,16 +7,16 @@ use App\Models\Verification;
 use App\Models\NetworkPrefix;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Cache;
-use App\Services\VerificationService;
+use App\Services\TmtService;
 use App\Exports\VerificationExport;
 
 class VerificationController extends Controller
 {
-    private $verificationService;
+    private $tmtService;
 
-    public function __construct(VerificationService $verificationService)
+    public function __construct(TmtService $tmtService)
     {
-        $this->verificationService = $verificationService;
+        $this->tmtService = $tmtService;
     }
 
     /**
@@ -53,7 +53,7 @@ class VerificationController extends Controller
 
         $networkPrefixes = NetworkPrefix::where('live_coverage', true)->latest()->get();
 
-        return view('forms.network-verification', compact('verifications', 'networkPrefixes'));
+        return view('verifications.index', compact('verifications', 'networkPrefixes'));
     }
 
     /**
@@ -66,7 +66,7 @@ class VerificationController extends Controller
         ]);
 
         $phoneNumber = $request->phone_number;
-        $result = $this->verificationService->checkNetworkPrefix($phoneNumber);
+        $result = $this->tmtService->checkNetworkPrefix($phoneNumber);
 
         return response()->json($result);
     }
@@ -89,7 +89,7 @@ class VerificationController extends Controller
             'data_freshness' => $dataFreshness
         ]);
 
-        $result = $this->verificationService->verifyNumber($phoneNumber, $dataFreshness);
+        $result = $this->tmtService->verifyNumber($phoneNumber, $dataFreshness);
 
         \Log::info('VerificationService result', [
             'phone' => $phoneNumber,
@@ -154,9 +154,22 @@ class VerificationController extends Controller
         $phoneNumbers = $request->phone_numbers;
         $dataFreshness = $request->data_freshness;
 
-        $batchResult = $this->verificationService->verifyBatch($phoneNumbers, $dataFreshness);
+        $batchResult = $this->tmtService->verifyBatchOptimized($phoneNumbers, $dataFreshness);
         $results = $batchResult['results'];
         $statistics = $batchResult['statistics'];
+
+        // Add missing statistics for compatibility with existing code
+        $statistics['total_numbers'] = $statistics['total'] ?? count($phoneNumbers);
+        $statistics['database_hits'] = $statistics['db_hits'] ?? 0;
+
+        // Calculate skipped_no_coverage from results
+        $skippedNoCoverage = 0;
+        foreach ($results as $result) {
+            if (isset($result['skip_reason']) && $result['skip_reason'] === 'no_live_coverage') {
+                $skippedNoCoverage++;
+            }
+        }
+        $statistics['skipped_no_coverage'] = $skippedNoCoverage;
 
         // Separate results by type
         $savedResults = [];

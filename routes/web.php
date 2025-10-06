@@ -166,20 +166,6 @@ Route::view('others/search-result', 'others.search-result')->name('search-result
 
 // Route::get('/home', 'HomeController@index')->name('home');
 
-// Verification routes
-// Route::get('verify/index', 'App\Http\Controllers\VerificationController@index')->name('verify');
-// Route::post('verify', 'App\Http\Controllers\VerificationController@verify')->name('verification.verify');
-// Route::post('verify/batch', 'App\Http\Controllers\VerificationController@verifyBatch')->name('verification.batch');
-// Route::get('verify/export', 'App\Http\Controllers\VerificationController@export')->name('verification.export');
-// Route::get('verify/results', 'App\Http\Controllers\VerificationController@results')->name('verification.results');
-
-// Country Check routes
-Route::get('country-check', 'App\Http\Controllers\CountryCheckController@index')->name('country.check');
-Route::post('country-check/check', 'App\Http\Controllers\CountryCheckController@check')->name('country.check.carrier');
-Route::post('country-check/clear-cache', 'App\Http\Controllers\CountryCheckController@clearCache')->name('country.check.clear-cache');
-Route::get('country-check/country-codes', 'App\Http\Controllers\CountryCheckController@getCountryCodes')->name('country.check.codes');
-
-// Network Prefix Verification routes
 Route::get('verification', 'App\Http\Controllers\VerificationController@index')->name('verification.index');
     Route::post('verification/check', 'App\Http\Controllers\VerificationController@checkNetworkPrefix')->name('verification.check');
     Route::post('verification/verify', 'App\Http\Controllers\VerificationController@verify')->name('verification.verify');

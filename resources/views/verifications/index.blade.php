@@ -61,69 +61,14 @@
                                     <th>Live Coverage</th>
                                     <th>Type</th>
                                     <th>Status</th>
+                                    <th>Status Message</th>
                                     <th>Ported</th>
                                     <th>Present</th>
-                                    <th>Transaction ID</th>
                                     <th>Verified</th>
                                 </tr>
                             </thead>
-                            <tbody>
-                                @forelse ($verifications as $verification)
-                                    <tr data-phone="{{ $verification->number }}">
-                                        <td>{{ $verification->number }}</td>
-                                        <td>{{ $verification->networkPrefix?->country_name ?? 'Unknown' }}</td>
-                                        <td>{{ $verification->networkPrefix?->min_length ?? 'N/A' }}/{{ $verification->networkPrefix?->max_length ?? 'N/A' }}</td>
-                                        <td>{{ $verification->networkPrefix?->network_name ?? 'Unknown' }}</td>
-                                        <td>{{ $verification->mcc }}/{{ $verification->mnc }}</td>
-                                        <td>
-                                            @php
-                                                $liveCoverage = $verification->networkPrefix?->live_coverage ?? $verification->isSuccessful();
-                                            @endphp
-                                            <span class="badge badge-pill badge-outline-{{ $liveCoverage ? 'success' : 'danger' }} p-2 m-1">
-                                                {{ $liveCoverage ? 'Yes' : 'No' }}
-                                            </span>
-                                        </td>
-                                        <td>{{ ucfirst($verification->type ?? 'unknown') }}</td>
-                                        <td>
-                                            <span
-                                                class="badge badge-pill badge-outline-{{ $verification->isSuccessful() ? 'success' : 'danger' }} p-2 m-1">
-                                                {{ $verification->status_text }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span
-                                                class="badge badge-pill badge-outline-{{ $verification->ported ? 'success' : 'secondary' }} p-2 m-1">
-                                                {{ $verification->ported ? 'Yes' : 'No' }}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            @php
-                                                $present = strtolower($verification->present ?? 'na');
-                                                if (!in_array($present, ['yes', 'no', 'na'])) {
-                                                    $present = 'na';
-                                                }
-
-                                                $presentText = ucfirst($present);
-                                                $presentClass = 'secondary';
-
-                                                if ($present === 'yes') {
-                                                    $presentClass = 'success';
-                                                } elseif ($present === 'no') {
-                                                    $presentClass = 'secondary';
-                                                } elseif ($present === 'na') {
-                                                    $presentClass = 'secondary';
-                                                }
-                                            @endphp
-
-                                            <span class="badge badge-pill badge-outline-{{ $presentClass }} p-2 m-1">
-                                                {{ $presentText }}
-                                            </span>
-                                        </td>
-                                        <td>{{ $verification->trxid ?? 'N/A' }}</td>
-                                        <td>{{ $verification->created_at->format('Y-m-d H:i') }}</td>
-                                    </tr>
-                                @empty
-                                @endforelse
+                            <tbody id="verifications-tbody">
+                                <!-- Data will be loaded via API -->
                             </tbody>
                         </table>
                     </div>
@@ -248,7 +193,19 @@
     <script src="{{ asset('assets/js/vendor/datatables.min.js') }}"></script>
     <script src="{{ asset('assets/js/datatables.script.js') }}"></script>
     <script src="{{ asset('assets/js/vendor/dropzone.min.js') }}"></script>
-    <script src="{{ asset('assets/js/dropzone.script.js') }}"></script>
+
+    <script>
+        // API Configuration from Laravel
+        const API_CONFIG = {
+            baseUrl: window.location.origin, // Use current domain
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            }
+        };
+        console.log('API_CONFIG:', API_CONFIG); // Debug output
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <script>
@@ -428,12 +385,11 @@
             const now = new Date();
             const formattedDate = now.getFullYear() + '-' +
                 String(now.getMonth() + 1).padStart(2, '0') + '-' +
-                String(now.getDate()).padStart(2, '0') + ' ' +
-                String(now.getHours()).padStart(2, '0') + ':' +
-                String(now.getMinutes()).padStart(2, '0');
+                String(now.getDate()).padStart(2, '0');
 
             const statusClass = (verificationData.status === 0) ? 'success' : 'danger';
-            const statusText = verificationData.status_message || 'Unknown';
+            const statusText = verificationData.status === 0 ? 'Success' : 'Failed';
+            const statusMessage = verificationData.status_message || 'Unknown';
             const portedClass = verificationData.ported ? 'success' : 'secondary';
             const portedText = verificationData.ported ? 'Yes' : 'No';
 
@@ -448,13 +404,14 @@
 
             const rowData = [
                 phoneNumber,
-                verificationData.country_name || 'Unknown',
-                (verificationData.min_length || 'N/A') + '/' + (verificationData.max_length || 'N/A'),
-                verificationData.network_name || 'KH Cellcard Mobile',
+                verificationData.network_prefix?.country_name || verificationData.country_name || 'Cambodia',
+                (verificationData.network_prefix?.min_length || verificationData.min_length || 'N/A') + '/' + (verificationData.network_prefix?.max_length || verificationData.max_length || 'N/A'),
+                verificationData.network_prefix?.network_name || verificationData.network_name || verificationData.network || 'KH Cellcard Mobile',
                 (verificationData.mcc || '') + '/' + (verificationData.mnc || ''),
                 `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
                 verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) : 'Unknown',
                 `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
+                statusMessage,
                 `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
                 (() => {
                     let present = verificationData.present ? verificationData.present.toLowerCase() : 'na';
@@ -473,7 +430,6 @@
 
                     return `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`;
                 })(),
-                verificationData.trxid || 'N/A',
                 formattedDate
             ];
 
@@ -527,7 +483,93 @@
             });
         }
 
+        // Load verifications from server-side data
+        function loadVerificationsFromServerData() {
+            console.log('Loading verifications from server-side data...');
+
+            // Use the verifications data passed from the controller
+            const verifications = @json($verifications ?? []);
+            console.log('Server-side verifications:', verifications);
+
+            if (verifications && verifications.length > 0) {
+                populateVerificationTable(verifications);
+                console.log(`Loaded ${verifications.length} verifications from server data`);
+            } else {
+                console.log('No verifications found in server data');
+                showAlert('info', 'No Data', 'No verification records found.');
+            }
+        }
+
+        // Populate the verification table with server data
+        function populateVerificationTable(verifications) {
+            // Wait for DataTable to be initialized by datatables.script.js
+            if (!$.fn.DataTable.isDataTable('#network_verification_table')) {
+                // If DataTable is not ready yet, wait a bit and try again
+                setTimeout(() => populateVerificationTable(verifications), 100);
+                return;
+            }
+
+            const table = $('#network_verification_table').DataTable();
+
+            // Clear existing data
+            table.clear();
+
+            if (verifications && verifications.length > 0) {
+                verifications.forEach(function(verification) {
+                    const liveCoverage = verification.network_prefix?.live_coverage ?? (verification.status === 0);
+                    const liveCoverageClass = liveCoverage ? 'success' : 'danger';
+                    const liveCoverageText = liveCoverage ? 'Yes' : 'No';
+
+                    const statusClass = (verification.status === 0) ? 'success' : 'danger';
+                    const statusText = verification.status === 0 ? 'Success' : 'Failed';
+                    const statusMessage = verification.status_message || 'Unknown';
+
+                    const portedClass = verification.ported ? 'success' : 'secondary';
+                    const portedText = verification.ported ? 'Yes' : 'No';
+
+                    // Handle present field
+                    let present = (verification.present || 'na').toLowerCase();
+                    if (!['yes', 'no', 'na'].includes(present)) {
+                        present = 'na';
+                    }
+                    const presentText = present.charAt(0).toUpperCase() + present.slice(1);
+                    let presentClass = 'secondary';
+                    if (present === 'yes') {
+                        presentClass = 'success';
+                    }
+
+                    const rowData = [
+                        verification.number,
+                        verification.network_prefix?.country_name || verification.country_name || 'Unknown',
+                        (verification.network_prefix?.min_length || 'N/A') + '/' + (verification.network_prefix?.max_length || 'N/A'),
+                        verification.network_prefix?.network_name || verification.network_name || 'Unknown',
+                        (verification.mcc || '') + '/' + (verification.mnc || ''),
+                        `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
+                        verification.type ? verification.type.charAt(0).toUpperCase() + verification.type.slice(1) : 'Unknown',
+                        `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
+                        statusMessage,
+                        `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
+                        `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`,
+                        new Date(verification.created_at).toLocaleDateString()
+                    ];
+
+                    // Add row with data-phone attribute
+                    const newRow = table.row.add(rowData).draw(false);
+                    $(newRow.node()).attr('data-phone', verification.number);
+                });
+
+                console.log(`Loaded ${verifications.length} verifications from API`);
+            } else {
+                console.log('No verifications returned from API');
+            }
+
+            table.draw();
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
+            // Load verifications from server-side data
+            loadVerificationsFromServerData();
+
             const verifyBtn = document.getElementById('verifyBtn');
             const phoneInput = document.getElementById('phone_number');
             const phoneError = document.getElementById('phone-error');
@@ -599,40 +641,53 @@
                     const countryName = result.country_name || 'Unknown';
                     const networkName = result.network_name || 'Unknown';
 
-                    detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})`;
-
-                    // Handle partial matches (country code inputs) - show info without errors
-                    if (result.partial_match) {
-                        validationAlert.className = 'alert alert-info mb-0';
-                        coverageStatus.textContent = result.live_coverage ? 'Available' : 'Not Available';
-
-                        // Don't show input as invalid during typing - just neutral
-                        phoneInput.classList.remove('is-invalid', 'is-valid');
-                        phoneError.textContent = ''; // No error message during typing
-
-                        // Disable verify button for incomplete numbers (but don't show error)
-                        verifyBtn.disabled = true;
-                        verifyBtn.title = 'Complete the phone number to enable verification';
-                    } else if (result.live_coverage) {
-                        validationAlert.className = 'alert alert-success mb-0';
-                        coverageStatus.textContent = 'Available - API call will be made';
-                        phoneInput.classList.remove('is-invalid');
-                        phoneInput.classList.add('is-valid');
-                        phoneError.textContent = '';
-
-                        // Enable verify button for complete valid numbers
-                        verifyBtn.disabled = false;
-                        verifyBtn.title = '';
-                    } else {
+                    // Enhanced display for international scenarios
+                    if (result.ambiguous) {
+                        // Multiple countries possible - show helpful information
+                        detectedInfo.textContent = `${countryName} - ${networkName}`;
+                        coverageStatus.textContent = `Continue typing (${result.countries?.join(', ') || 'Multiple options'})`;
                         validationAlert.className = 'alert alert-warning mb-0';
-                        coverageStatus.textContent = 'Not Available - API call will be skipped';
-                        phoneInput.classList.remove('is-invalid');
-                        phoneInput.classList.add('is-valid');
-                        phoneError.textContent = '';
 
-                        // Enable verify button even for no coverage (user can still proceed)
-                        verifyBtn.disabled = false;
-                        verifyBtn.title = '';
+                        phoneInput.classList.remove('is-invalid', 'is-valid');
+                        phoneError.textContent = '';
+                        verifyBtn.disabled = true;
+                        verifyBtn.title = 'Continue typing to identify the country';
+                    } else {
+                        detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})`;
+
+                        // Handle partial matches (country code inputs) - show info without errors
+                        if (result.partial_match) {
+                            validationAlert.className = 'alert alert-info mb-0';
+                            coverageStatus.textContent = result.live_coverage ? 'Available' : 'Not Available';
+
+                            // Don't show input as invalid during typing - just neutral
+                            phoneInput.classList.remove('is-invalid', 'is-valid');
+                            phoneError.textContent = ''; // No error message during typing
+
+                            // Disable verify button for incomplete numbers (but don't show error)
+                            verifyBtn.disabled = true;
+                            verifyBtn.title = 'Complete the phone number to enable verification';
+                        } else if (result.live_coverage) {
+                            validationAlert.className = 'alert alert-success mb-0';
+                            coverageStatus.textContent = 'Available - API call will be made';
+                            phoneInput.classList.remove('is-invalid');
+                            phoneInput.classList.add('is-valid');
+                            phoneError.textContent = '';
+
+                            // Enable verify button for complete valid numbers
+                            verifyBtn.disabled = false;
+                            verifyBtn.title = '';
+                        } else {
+                            validationAlert.className = 'alert alert-warning mb-0';
+                            coverageStatus.textContent = 'Not Available - Verification disabled';
+                            phoneInput.classList.remove('is-invalid');
+                            phoneInput.classList.add('is-valid');
+                            phoneError.textContent = '';
+
+                            // Disable verify button for no coverage numbers
+                            verifyBtn.disabled = true;
+                            verifyBtn.title = 'This operator does not support live coverage verification';
+                        }
                     }
 
                     validationInfo.style.display = 'block';
@@ -715,14 +770,10 @@
 
                 verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                // Make API call to new verification service
-                fetch('{{ route("verification.verify") }}', {
+                // Make API call to web verification route
+                fetch('/verification/verify', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')
-                                .getAttribute('content')
-                        },
+                        headers: API_CONFIG.headers,
                         body: JSON.stringify({
                             phone_number: phoneNumber,
                             data_freshness: dataFreshness
@@ -741,21 +792,30 @@
                         if (data.success) {
                             $(modal).modal('hide');
 
-                            if (data.cached) {
-                                showAlert('info', 'Cached Result', 'Phone number verification retrieved from cache.');
-                                highlightRow(data.data.phone_number || data.data.number);
+                            // Handle different sources from our API
+                            if (data.source === 'cache') {
+                                showAlert('info', 'Cache Hit', 'Phone number verification retrieved from cache.');
+                                highlightRow(data.data.number);
+                            } else if (data.source === 'database') {
+                                showAlert('info', 'Database Hit', 'Phone number verification retrieved from database.');
+                                highlightRow(data.data.number);
+                            } else if (data.source === 'tmt_api') {
+                                showAlert('success', 'TMT API Call', 'Phone number verified with fresh TMT API call.');
+                                updateTableRow(data.data);
                             } else {
-                                let successMessage = 'Phone number verified successfully!';
-                                if (data.data.skip_reason === 'no_live_coverage') {
-                                    successMessage = 'Phone number processed - no live coverage, API call skipped to save costs.';
-                                }
-                                showAlert('success', 'Success', successMessage);
+                                // Fallback for any other cases
+                                showAlert('success', 'Verification Complete', 'Phone number verified successfully!');
                                 updateTableRow(data.data);
                             }
+
+                            // For cache/database hits, we could optionally reload the page to get fresh server data
+                            // if (data.source === 'cache' || data.source === 'database') {
+                            //     window.location.reload();
+                            // }
                         } else {
                             phoneInput.classList.add('is-invalid');
-                            phoneError.textContent = data.error || 'Verification failed';
-                            showAlert('warning', 'Warning', data.error || 'Phone number verification failed.');
+                            phoneError.textContent = data.message || 'Verification failed';
+                            showAlert('danger', 'Error', data.message || 'Phone number verification failed.');
                         }
                     })
                     .catch(error => {

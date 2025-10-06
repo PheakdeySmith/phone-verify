@@ -321,6 +321,228 @@ class NetworkPrefixSeeder extends Seeder
                 'mnc' => '02',
                 'live_coverage' => false,
             ],
+
+            // === INTERNATIONAL OPERATORS (20 operators from around the world) ===
+
+            // USA - Verizon
+            [
+                'prefix' => '1201',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'United States',
+                'network_name' => 'Verizon Wireless',
+                'mcc' => '310',
+                'mnc' => '004',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '1202',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'United States',
+                'network_name' => 'AT&T Mobility',
+                'mcc' => '310',
+                'mnc' => '410',
+                'live_coverage' => true,
+            ],
+
+            // UK - Multiple operators
+            [
+                'prefix' => '447',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'United Kingdom',
+                'network_name' => 'O2 UK',
+                'mcc' => '234',
+                'mnc' => '10',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '4475',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'United Kingdom',
+                'network_name' => 'Vodafone UK',
+                'mcc' => '234',
+                'mnc' => '15',
+                'live_coverage' => true,
+            ],
+
+            // Germany
+            [
+                'prefix' => '4915',
+                'min_length' => 11,
+                'max_length' => 12,
+                'country_name' => 'Germany',
+                'network_name' => 'Deutsche Telekom',
+                'mcc' => '262',
+                'mnc' => '01',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '4917',
+                'min_length' => 11,
+                'max_length' => 12,
+                'country_name' => 'Germany',
+                'network_name' => 'Vodafone Germany',
+                'mcc' => '262',
+                'mnc' => '02',
+                'live_coverage' => false,
+            ],
+
+            // France
+            [
+                'prefix' => '336',
+                'min_length' => 10,
+                'max_length' => 10,
+                'country_name' => 'France',
+                'network_name' => 'Orange France',
+                'mcc' => '208',
+                'mnc' => '01',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '337',
+                'min_length' => 10,
+                'max_length' => 10,
+                'country_name' => 'France',
+                'network_name' => 'SFR',
+                'mcc' => '208',
+                'mnc' => '10',
+                'live_coverage' => false,
+            ],
+
+            // Russia
+            [
+                'prefix' => '7900',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'Russia',
+                'network_name' => 'MTS Russia',
+                'mcc' => '250',
+                'mnc' => '01',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '7901',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'Russia',
+                'network_name' => 'Beeline',
+                'mcc' => '250',
+                'mnc' => '99',
+                'live_coverage' => false,
+            ],
+
+            // India
+            [
+                'prefix' => '9191',
+                'min_length' => 12,
+                'max_length' => 12,
+                'country_name' => 'India',
+                'network_name' => 'Bharti Airtel',
+                'mcc' => '404',
+                'mnc' => '10',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '9194',
+                'min_length' => 12,
+                'max_length' => 12,
+                'country_name' => 'India',
+                'network_name' => 'Reliance Jio',
+                'mcc' => '405',
+                'mnc' => '840',
+                'live_coverage' => true,
+            ],
+
+            // Japan
+            [
+                'prefix' => '8190',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'Japan',
+                'network_name' => 'NTT DoCoMo',
+                'mcc' => '440',
+                'mnc' => '10',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '8180',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'Japan',
+                'network_name' => 'SoftBank Mobile',
+                'mcc' => '440',
+                'mnc' => '20',
+                'live_coverage' => false,
+            ],
+
+            // Brazil
+            [
+                'prefix' => '5511',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'Brazil',
+                'network_name' => 'Vivo Brazil',
+                'mcc' => '724',
+                'mnc' => '11',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '5521',
+                'min_length' => 11,
+                'max_length' => 11,
+                'country_name' => 'Brazil',
+                'network_name' => 'TIM Brazil',
+                'mcc' => '724',
+                'mnc' => '03',
+                'live_coverage' => false,
+            ],
+
+            // Australia
+            [
+                'prefix' => '6140',
+                'min_length' => 10,
+                'max_length' => 10,
+                'country_name' => 'Australia',
+                'network_name' => 'Telstra',
+                'mcc' => '505',
+                'mnc' => '01',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '6141',
+                'min_length' => 10,
+                'max_length' => 10,
+                'country_name' => 'Australia',
+                'network_name' => 'Optus',
+                'mcc' => '505',
+                'mnc' => '02',
+                'live_coverage' => true,
+            ],
+
+            // Thailand - neighboring country
+            [
+                'prefix' => '6681',
+                'min_length' => 10,
+                'max_length' => 10,
+                'country_name' => 'Thailand',
+                'network_name' => 'AIS Thailand',
+                'mcc' => '520',
+                'mnc' => '01',
+                'live_coverage' => true,
+            ],
+            [
+                'prefix' => '6689',
+                'min_length' => 10,
+                'max_length' => 10,
+                'country_name' => 'Thailand',
+                'network_name' => 'DTAC',
+                'mcc' => '520',
+                'mnc' => '05',
+                'live_coverage' => false,
+            ],
         ];
 
         // Insert the data
@@ -329,6 +551,8 @@ class NetworkPrefixSeeder extends Seeder
         }
 
         $this->command->info('Network prefixes seeded successfully!');
-        $this->command->info('Added ' . count($prefixes) . ' Cambodia Cellcard Mobile prefixes');
+        $this->command->info('Added ' . count($prefixes) . ' network prefixes');
+        $this->command->info('- Cambodia: 29 prefixes');
+        $this->command->info('- International: 20 operator prefixes');
     }
 }

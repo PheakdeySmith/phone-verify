@@ -9,7 +9,8 @@
       "Bash(xargs:*)",
       "Read(//home/smith/Pictures/Screenshots/**)",
       "Bash(mysql:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": []
