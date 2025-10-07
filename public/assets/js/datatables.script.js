@@ -37,14 +37,14 @@ $(document).ready(function () {
     if ($('#network_verification_table').length) {
         var networkTable = $('#network_verification_table').DataTable({
             "order": [
-                [11, "desc"] // Order by "Verified" column (last column) descending to show newest first
+                [10, "desc"] // Order by "Verified" column (last column) descending to show newest first
             ],
             "pageLength": 25,
             "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
             "dom": '<"top"lf>rt<"bottom"ip><"clear">',
             "columnDefs": [
                 {
-                    "targets": [5, 7, 8, 9], // Live Coverage, Status, Ported, Present columns
+                    "targets": [4, 6, 8, 9], // Live Coverage, Status, Ported, Present columns
                     "orderable": true,
                     "searchable": true
                 }

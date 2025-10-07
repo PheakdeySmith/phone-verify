@@ -55,7 +55,6 @@
                                 <tr>
                                     <th>Number</th>
                                     <th>Country</th>
-                                    <th>Min/Max Length</th>
                                     <th>Network</th>
                                     <th>MCC/MNC</th>
                                     <th>Live Coverage</th>
@@ -405,8 +404,7 @@
             const rowData = [
                 phoneNumber,
                 verificationData.network_prefix?.country_name || verificationData.country_name || 'Cambodia',
-                (verificationData.network_prefix?.min_length || verificationData.min_length || 'N/A') + '/' + (verificationData.network_prefix?.max_length || verificationData.max_length || 'N/A'),
-                verificationData.network_prefix?.network_name || verificationData.network_name || verificationData.network || 'KH Cellcard Mobile',
+                verificationData.network || verificationData.network_name || 'Unknown Network',
                 (verificationData.mcc || '') + '/' + (verificationData.mnc || ''),
                 `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
                 verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) : 'Unknown',
@@ -541,8 +539,7 @@
                     const rowData = [
                         verification.number,
                         verification.network_prefix?.country_name || verification.country_name || 'Unknown',
-                        (verification.network_prefix?.min_length || 'N/A') + '/' + (verification.network_prefix?.max_length || 'N/A'),
-                        verification.network_prefix?.network_name || verification.network_name || 'Unknown',
+                        verification.network || verification.network_name || 'Unknown',
                         (verification.mcc || '') + '/' + (verification.mnc || ''),
                         `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
                         verification.type ? verification.type.charAt(0).toUpperCase() + verification.type.slice(1) : 'Unknown',

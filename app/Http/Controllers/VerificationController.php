@@ -27,12 +27,9 @@ class VerificationController extends Controller
         // Get all network prefixes for lookup
         $allNetworkPrefixes = NetworkPrefix::all()->keyBy('prefix');
 
-        // Only show verifications that have live coverage or successful API results
+        // Show all successful verifications (status = 0)
         $verifications = Verification::with('networkPrefix')
-            ->whereHas('networkPrefix', function($query) {
-                $query->where('live_coverage', true);
-            })
-            ->orWhere('status', 0) // Include successful verifications even if no network prefix relation
+            ->where('status', 0) // Only show successful verifications
             ->latest()
             ->get();
 
