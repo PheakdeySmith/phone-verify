@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             NetworkPrefixSeeder::class,
-            // UserSeeder::class,
+            UserSeeder::class,
         ]);
     }
 }
