@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\TokenController;
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
+
 // Protected routes - Need to login first to manage tokens
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -20,7 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/tokens', [TokenController::class, 'destroyAll']);
     
     // API Routes - Can be accessed with permanent token
-    Route::get('/verifications', [InternalVerificationController::class, 'index']);
+    Route::get('/verifications', [InternalVerificationController::class, 'getAll']);
     Route::get('/verifications/{id}', [InternalVerificationController::class, 'show']);
     Route::post('/verifications', [InternalVerificationController::class, 'store']);
     Route::put('/verifications/{id}', [InternalVerificationController::class, 'update']);

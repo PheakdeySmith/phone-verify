@@ -7,48 +7,22 @@ use Illuminate\Http\Request;
 use App\Models\Verification;
 use App\Models\NetworkPrefix;
 use App\Services\TmtService;
+use App\Services\OptimizedVerificationService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class InternalVerificationController extends Controller
 {
     protected $tmtService;
+    protected $optimizedService;
 
-    public function __construct(TmtService $tmtService)
+    public function __construct(TmtService $tmtService, OptimizedVerificationService $optimizedService)
     {
         $this->tmtService = $tmtService;
+        $this->optimizedService = $optimizedService;
     }
 
-    public function index()
-    {
-        $allNetworkPrefixes = NetworkPrefix::all()->keyBy('prefix');
-        $verifications      = Verification::with('networkPrefix')
-            ->whereHas('networkPrefix', function($query) {
-                $query->where('live_coverage', true);
-            })
-            ->orWhere('status', 0)
-            ->latest()
-            ->get();
-
-        $verifications->each(function($verification) use ($allNetworkPrefixes) {
-            if (!$verification->networkPrefix) {
-                $phoneNumber = $verification->number;
-                for ($i = 5; $i >= 3; $i--) {
-                    $prefix = substr($phoneNumber, 0, $i);
-                    if ($allNetworkPrefixes->has($prefix)) {
-                        $verification->setRelation('networkPrefix', $allNetworkPrefixes[$prefix]);
-                        break;
-                    }
-                }
-            }
-        });
-
-        $networkPrefixes = NetworkPrefix::where('live_coverage', true)->latest()->get();
-
-        return view('verifications.index', compact('verifications', 'networkPrefixes'));
-    }
-
-    public function getAll()
+      public function getAll()
     {
         $verifications = Verification::with('networkPrefix')->paginate(25);
 

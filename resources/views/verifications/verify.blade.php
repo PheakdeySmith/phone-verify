@@ -59,15 +59,15 @@
                             <thead>
                                 <tr>
                                     <th>Number</th>
-                                    <th>Provider</th>
-                                    <th>Cost</th>
                                     <th>Country</th>
-                                    <th>Network/Carrier</th>
+                                    <th>Network</th>
+                                    <th>MCC/MNC</th>
+                                    <th>Live Coverage</th>
+                                    <th>Type</th>
                                     <th>Status</th>
-                                    <th>Valid</th>
-                                    <th>Present</th>
+                                    <th>Status Message</th>
                                     <th>Ported</th>
-                                    <th>Fraud Score</th>
+                                    <th>Present</th>
                                     <th>Verified</th>
                                 </tr>
                             </thead>
@@ -208,7 +208,6 @@
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
             }
         };
-        console.log('API_CONFIG:', API_CONFIG); // Debug output
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -650,84 +649,48 @@
                 String(now.getMonth() + 1).padStart(2, '0') + '-' +
                 String(now.getDate()).padStart(2, '0');
 
-            // Provider badge
-            const provider = verificationData.provider || 'Unknown';
-            const providerClass = provider === 'TMT' ? 'primary' : provider === 'IPQS' ? 'info' : 'secondary';
+            const statusClass = (verificationData.status === 0) ? 'success' : 'danger';
+            const statusText = verificationData.status === 0 ? 'Success' : 'Failed';
+            const statusMessage = verificationData.status_message || 'Unknown';
+            const portedClass = verificationData.ported ? 'success' : 'secondary';
+            const portedText = verificationData.ported ? 'Yes' : 'No';
 
-            // Cost formatting
-            const cost = verificationData.cost ? '$' + parseFloat(verificationData.cost).toFixed(6) : 'N/A';
+            // Determine live coverage status - only show if has live coverage
+            let liveCoverageClass = 'success';
+            let liveCoverageText = 'Yes';
 
-            // Status handling - for TMT (status field) vs IPQS (valid field)
-            let statusClass = 'secondary';
-            let statusText = 'Unknown';
-
-            if (provider === 'TMT' && verificationData.tmt_status !== undefined) {
-                statusClass = verificationData.tmt_status === 0 ? 'success' : 'danger';
-                statusText = verificationData.tmt_status === 0 ? 'Success' : 'Failed';
-            } else if (provider === 'IPQS' && verificationData.ipqs_valid !== undefined) {
-                statusClass = verificationData.ipqs_valid ? 'success' : 'danger';
-                statusText = verificationData.ipqs_valid ? 'Valid' : 'Invalid';
+            if (verificationData.prefix_info && verificationData.prefix_info.live_coverage !== undefined) {
+                liveCoverageClass = verificationData.prefix_info.live_coverage ? 'success' : 'danger';
+                liveCoverageText = verificationData.prefix_info.live_coverage ? 'Yes' : 'No';
             }
-
-            // Valid field - mainly for IPQS
-            let validClass = 'secondary';
-            let validText = 'N/A';
-            if (verificationData.ipqs_valid !== undefined) {
-                validClass = verificationData.ipqs_valid ? 'success' : 'danger';
-                validText = verificationData.ipqs_valid ? 'Yes' : 'No';
-            } else if (verificationData.tmt_status !== undefined) {
-                validClass = verificationData.tmt_status === 0 ? 'success' : 'danger';
-                validText = verificationData.tmt_status === 0 ? 'Yes' : 'No';
-            }
-
-            // Present field
-            let present = 'na';
-            if (verificationData.tmt_present) {
-                present = verificationData.tmt_present.toLowerCase();
-            } else if (verificationData.ipqs_active !== undefined) {
-                present = verificationData.ipqs_active ? 'yes' : 'no';
-            }
-
-            if (!['yes', 'no', 'na'].includes(present)) {
-                present = 'na';
-            }
-
-            const presentText = present.charAt(0).toUpperCase() + present.slice(1);
-            let presentClass = 'secondary';
-            if (present === 'yes') {
-                presentClass = 'success';
-            } else if (present === 'no') {
-                presentClass = 'warning';
-            }
-
-            // Ported field
-            let portedClass = 'secondary';
-            let portedText = 'N/A';
-            if (verificationData.tmt_ported !== undefined) {
-                portedClass = verificationData.tmt_ported ? 'warning' : 'success';
-                portedText = verificationData.tmt_ported ? 'Yes' : 'No';
-            }
-
-            // Country - combine TMT/IPQS
-            const country = verificationData.ipqs_country || verificationData.tmt_country || 'Unknown';
-
-            // Network/Carrier - combine TMT/IPQS
-            const network = verificationData.tmt_network || verificationData.ipqs_carrier || 'Unknown';
-
-            // Fraud Score - IPQS only
-            const fraudScore = verificationData.ipqs_fraud_score || 'N/A';
 
             const rowData = [
                 phoneNumber,
-                `<span class="badge badge-pill badge-outline-${providerClass} p-2 m-1">${provider}</span>`,
-                cost,
-                country,
-                network,
+                verificationData.network_prefix?.country_name || verificationData.country_name || 'Cambodia',
+                verificationData.network || verificationData.network_name || 'Unknown Network',
+                (verificationData.mcc || '') + '/' + (verificationData.mnc || ''),
+                `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
+                verificationData.type ? verificationData.type.charAt(0).toUpperCase() + verificationData.type.slice(1) : 'Unknown',
                 `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
-                `<span class="badge badge-pill badge-outline-${validClass} p-2 m-1">${validText}</span>`,
-                `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`,
+                statusMessage,
                 `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
-                fraudScore,
+                (() => {
+                    let present = verificationData.present ? verificationData.present.toLowerCase() : 'na';
+                    if (!['yes', 'no', 'na'].includes(present)) {
+                        present = 'na';
+                    }
+
+                    const presentText = present.charAt(0).toUpperCase() + present.slice(1);
+                    let presentClass = 'secondary';
+
+                    if (present === 'yes') {
+                        presentClass = 'success';
+                    } else if (present === 'no') {
+                        presentClass = 'secondary';
+                    }
+
+                    return `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`;
+                })(),
                 formattedDate
             ];
 
@@ -821,91 +784,46 @@
 
             if (verifications && verifications.length > 0) {
                 verifications.forEach(function(verification) {
-                    // Provider badge
-                    const provider = verification.provider || 'Unknown';
-                    const providerClass = provider === 'TMT' ? 'primary' : provider === 'IPQS' ? 'info' : 'secondary';
+                    const liveCoverage = verification.network_prefix?.live_coverage ?? (verification.status === 0);
+                    const liveCoverageClass = liveCoverage ? 'success' : 'danger';
+                    const liveCoverageText = liveCoverage ? 'Yes' : 'No';
 
-                    // Cost formatting
-                    const cost = verification.cost ? '$' + parseFloat(verification.cost).toFixed(6) : 'N/A';
+                    const statusClass = (verification.status === 0) ? 'success' : 'danger';
+                    const statusText = verification.status === 0 ? 'Success' : 'Failed';
+                    const statusMessage = verification.status_message || 'Unknown';
 
-                    // Status handling - for TMT (status field) vs IPQS (valid field)
-                    let statusClass = 'secondary';
-                    let statusText = 'Unknown';
+                    const portedClass = verification.ported ? 'success' : 'secondary';
+                    const portedText = verification.ported ? 'Yes' : 'No';
 
-                    if (provider === 'TMT' && verification.tmt_status !== undefined) {
-                        statusClass = verification.tmt_status === 0 ? 'success' : 'danger';
-                        statusText = verification.tmt_status === 0 ? 'Success' : 'Failed';
-                    } else if (provider === 'IPQS' && verification.ipqs_valid !== undefined) {
-                        statusClass = verification.ipqs_valid ? 'success' : 'danger';
-                        statusText = verification.ipqs_valid ? 'Valid' : 'Invalid';
-                    }
-
-                    // Valid field - mainly for IPQS
-                    let validClass = 'secondary';
-                    let validText = 'N/A';
-                    if (verification.ipqs_valid !== undefined) {
-                        validClass = verification.ipqs_valid ? 'success' : 'danger';
-                        validText = verification.ipqs_valid ? 'Yes' : 'No';
-                    } else if (verification.tmt_status !== undefined) {
-                        validClass = verification.tmt_status === 0 ? 'success' : 'danger';
-                        validText = verification.tmt_status === 0 ? 'Yes' : 'No';
-                    }
-
-                    // Present field
-                    let present = 'na';
-                    if (verification.tmt_present) {
-                        present = verification.tmt_present.toLowerCase();
-                    } else if (verification.ipqs_active !== undefined) {
-                        present = verification.ipqs_active ? 'yes' : 'no';
-                    }
-
+                    // Handle present field
+                    let present = (verification.present || 'na').toLowerCase();
                     if (!['yes', 'no', 'na'].includes(present)) {
                         present = 'na';
                     }
-
                     const presentText = present.charAt(0).toUpperCase() + present.slice(1);
                     let presentClass = 'secondary';
                     if (present === 'yes') {
                         presentClass = 'success';
-                    } else if (present === 'no') {
-                        presentClass = 'warning';
                     }
-
-                    // Ported field
-                    let portedClass = 'secondary';
-                    let portedText = 'N/A';
-                    if (verification.tmt_ported !== undefined) {
-                        portedClass = verification.tmt_ported ? 'warning' : 'success';
-                        portedText = verification.tmt_ported ? 'Yes' : 'No';
-                    }
-
-                    // Country - combine TMT/IPQS
-                    const country = verification.ipqs_country || verification.tmt_country || 'Unknown';
-
-                    // Network/Carrier - combine TMT/IPQS
-                    const network = verification.tmt_network || verification.ipqs_carrier || 'Unknown';
-
-                    // Fraud Score - IPQS only
-                    const fraudScore = verification.ipqs_fraud_score || 'N/A';
 
                     const rowData = [
-                        verification.phone_number,
-                        `<span class="badge badge-pill badge-outline-${providerClass} p-2 m-1">${provider}</span>`,
-                        cost,
-                        country,
-                        network,
+                        verification.number,
+                        verification.network_prefix?.country_name || verification.country_name || 'Unknown',
+                        verification.network || verification.network_name || 'Unknown',
+                        (verification.mcc || '') + '/' + (verification.mnc || ''),
+                        `<span class="badge badge-pill badge-outline-${liveCoverageClass} p-2 m-1">${liveCoverageText}</span>`,
+                        verification.type ? verification.type.charAt(0).toUpperCase() + verification.type.slice(1) : 'Unknown',
                         `<span class="badge badge-pill badge-outline-${statusClass} p-2 m-1">${statusText}</span>`,
-                        `<span class="badge badge-pill badge-outline-${validClass} p-2 m-1">${validText}</span>`,
-                        `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`,
+                        statusMessage,
                         `<span class="badge badge-pill badge-outline-${portedClass} p-2 m-1">${portedText}</span>`,
-                        fraudScore,
+                        `<span class="badge badge-pill badge-outline-${presentClass} p-2 m-1">${presentText}</span>`,
                         new Date(verification.created_at).toLocaleDateString()
                     ];
 
                     // Add row with data-phone attribute
                     const newRow = table.row.add(rowData).draw(false);
                     const newNode = newRow.node();
-                    $(newNode).attr('data-phone', verification.phone_number);
+                    $(newNode).attr('data-phone', verification.number);
                     $(newNode).css('cursor', 'pointer');
                     $(newNode).attr('title', 'Click to view detailed verification results');
 
@@ -1001,8 +919,7 @@
                     // Enhanced display for international scenarios
                     if (result.ambiguous) {
                         // Multiple countries possible - show helpful information
-                        const costInfo = result.cost ? ` - Cost: $${result.cost}` : '';
-                        detectedInfo.textContent = `${countryName} - ${networkName}${costInfo}`;
+                        detectedInfo.textContent = `${countryName} - ${networkName}`;
                         coverageStatus.textContent = `Continue typing (${result.countries?.join(', ') || 'Multiple options'})`;
                         validationAlert.className = 'alert alert-warning mb-0';
 
@@ -1011,8 +928,7 @@
                         verifyBtn.disabled = true;
                         verifyBtn.title = 'Continue typing to identify the country';
                     } else {
-                        const costInfo = result.cost ? ` - Cost: $${result.cost}` : '';
-                        detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})${costInfo}`;
+                        detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})`;
 
                         // Handle partial matches (country code inputs) - show info without errors
                         if (result.partial_match) {

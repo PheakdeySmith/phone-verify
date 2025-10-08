@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Exception;
 use App\Models\Verification;
+use App\Models\NetworkPrefix;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
@@ -25,10 +26,12 @@ class TmtService
     {
         // First, check if this number has live coverage support
         $networkCheck = $this->checkNetworkPrefix($phoneNumber);
-        if ($networkCheck['success'] &&
+        if (
+            $networkCheck['success'] &&
             !$networkCheck['partial_match'] &&
             isset($networkCheck['live_coverage']) &&
-            !$networkCheck['live_coverage']) {
+            !$networkCheck['live_coverage']
+        ) {
 
             Log::info('Verification blocked: Number does not support live coverage', [
                 'phone' => $phoneNumber,
@@ -147,7 +150,10 @@ class TmtService
         $phoneNumber = is_array($data) ? (array_keys($data)[0] ?? null) : null;
         $responseData = $phoneNumber ? $data[$phoneNumber] : [];
 
-        return [
+        // Determine prefix and country from network_prefixes table
+        $prefixInfo = $this->findNetworkPrefix($phoneNumber);
+
+        $result = [
             'success' => ($responseData['status'] ?? 1) === 0,
             'phone_number' => $responseData['number'] ?? $phoneNumber,
             'cic' => $responseData['cic'] ?? null,
@@ -164,6 +170,29 @@ class TmtService
             'type' => $responseData['type'] ?? null,
             'trxid' => $responseData['trxid'] ?? null,
         ];
+
+        // Add prefix and country information from network_prefixes table
+        if ($prefixInfo) {
+            $result['prefix'] = $prefixInfo->prefix;
+            $result['country'] = $prefixInfo->country_name;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Find the network prefix information for a phone number
+     */
+    private function findNetworkPrefix($phoneNumber)
+    {
+        if (!$phoneNumber) {
+            return null;
+        }
+
+        // Find the longest matching prefix for the phone number
+        return NetworkPrefix::whereRaw('? LIKE CONCAT(prefix, "%")', [$phoneNumber])
+            ->orderByRaw('LENGTH(prefix) DESC')
+            ->first();
     }
 
     private function formatCached($result)
@@ -195,140 +224,140 @@ class TmtService
     }
 
     /**
- * Executes the API call to the TMT service.
- *
- * @param string $phoneNumber The phone number to verify.
- * @return array The verification result.
- */
-private function makeApiCall($phoneNumber, $validationInfo = null)
-{
-    // 1. Check live coverage first if validation info is provided and has carrier data
-    if ($validationInfo && isset($validationInfo['has_carrier_data']) && $validationInfo['has_carrier_data'] &&
-        isset($validationInfo['live_coverage']) && !$validationInfo['live_coverage']) {
-        Log::info('Skipping API call for phone number with no live coverage', [
-            'phone' => $phoneNumber,
-            'carrier' => $validationInfo['carrier_name'] ?? 'Unknown',
-            'country' => $validationInfo['iso2'] ?? 'Unknown'
-        ]);
+     * Executes the API call to the TMT service.
+     *
+     * @param string $phoneNumber The phone number to verify.
+     * @return array The verification result.
+     */
+    private function makeApiCall($phoneNumber, $validationInfo = null)
+    {
+        // 1. Check live coverage first if validation info is provided and has carrier data
+        if (
+            $validationInfo && isset($validationInfo['has_carrier_data']) && $validationInfo['has_carrier_data'] &&
+            isset($validationInfo['live_coverage']) && !$validationInfo['live_coverage']
+        ) {
+            Log::info('Skipping API call for phone number with no live coverage', [
+                'phone' => $phoneNumber,
+                'carrier' => $validationInfo['carrier_name'] ?? 'Unknown',
+                'country' => $validationInfo['iso2'] ?? 'Unknown'
+            ]);
+
+            return [
+                'success' => false,
+                'error' => 'Phone number has no live coverage - API verification skipped to save costs',
+                'phone_number' => $phoneNumber,
+                'network' => $validationInfo['carrier_name'] ?? 'Unknown',
+                'country_code' => $validationInfo['country_code'] ?? null,
+                'iso2' => $validationInfo['iso2'] ?? null,
+                'mcc' => $validationInfo['mcc'] ?? null,
+                'mnc' => $validationInfo['mnc'] ?? null,
+                'type' => 'mobile',
+                'status' => 999, // Custom status for no live coverage
+                'status_text' => 'No Live Coverage',
+                'ported' => false,
+                'present' => 'no',
+                'trxid' => null,
+                'skip_reason' => 'no_live_coverage'
+            ];
+        }
+
+        // 2. Validate credentials
+        if (empty($this->apiKey) || empty($this->apiSecret)) {
+            return $this->handleApiError('TMT API credentials not configured', $phoneNumber, 'Configuration Error');
+        }
+
+        try {
+            // 3. Make the API call
+            $url = "{$this->baseUrl}/format/{$this->apiKey}/{$this->apiSecret}/{$phoneNumber}";
+            Log::info('TMT API Request - cache miss', ['phone' => $phoneNumber]);
+            $response = Http::get($url);
+
+            // 4. Handle unsuccessful HTTP responses (e.g., 404, 500)
+            if (!$response->successful()) {
+                return $this->handleApiError(
+                    'API request failed with status: ' . $response->status(),
+                    $phoneNumber,
+                    'API Error',
+                    ['status' => $response->status(), 'response' => $response->body()]
+                );
+            }
+
+            $data = $response->json();
+
+            // 5. Handle cases where the API returns an empty but successful response
+            if (empty($data)) {
+                return $this->handleApiError(
+                    'API returned an empty response. Please check API credentials.',
+                    $phoneNumber,
+                    'Empty API Response'
+                );
+            }
+
+            // 6. Format the data and persist it if the verification was successful
+            $result = $this->formatResponse($data);
+
+            if ($result['success']) {
+                $this->saveResult($result);
+            }
+
+            return $result;
+        } catch (Exception $e) {
+            // 7. Catch any other exceptions (e.g., network connection issues)
+            return $this->handleApiError($e->getMessage(), $phoneNumber, 'Exception Error');
+        }
+    }
+
+    /**
+     * Saves a successful verification result to the database and caches it.
+     *
+     * @param array $resultData The formatted verification data.
+     * @return void
+     */
+    private function saveResult(array $resultData)
+    {
+        try {
+            // Use updateOrCreate to find a record by 'number' and update it,
+            // or create a new one if it doesn't exist. This prevents duplicates.
+            $verification = Verification::updateOrCreate(
+                ['number' => $resultData['number']], // <-- Attribute to find the record by
+                $resultData                          // <-- Values to update or create with
+            );
+
+            // Cache the newly updated or created model instance
+            $cacheKey = 'phone_verification:' . $resultData['number'];
+            Cache::put($cacheKey, $verification, now()->addHour());
+            Log::info('Verification result saved and cached.', ['phone' => $resultData['number']]);
+        } catch (Exception $e) {
+            Log::error('Failed to save or cache verification result.', [
+                'phone' => $resultData['number'],
+                'error' => $e->getMessage()
+            ]);
+            // This failure is logged but won't stop the successful API result from being returned.
+        }
+    }
+
+    /**
+     * Standardizes API error logging and response format.
+     *
+     * @param string $errorMessage The primary error message for the user.
+     * @param string $phoneNumber The phone number related to the error.
+     * @param string $statusMessage A short status code for the error type.
+     * @param array $logContext Additional context for server logs.
+     * @param int $statusCode The internal status code.
+     * @return array The formatted error response.
+     */
+    private function handleApiError(string $errorMessage, string $phoneNumber, string $statusMessage, array $logContext = [], int $statusCode = 1)
+    {
+        Log::error($errorMessage, array_merge(['phone' => $phoneNumber], $logContext));
 
         return [
             'success' => false,
-            'error' => 'Phone number has no live coverage - API verification skipped to save costs',
+            'error' => $errorMessage,
             'phone_number' => $phoneNumber,
-            'network' => $validationInfo['carrier_name'] ?? 'Unknown',
-            'country_code' => $validationInfo['country_code'] ?? null,
-            'iso2' => $validationInfo['iso2'] ?? null,
-            'mcc' => $validationInfo['mcc'] ?? null,
-            'mnc' => $validationInfo['mnc'] ?? null,
-            'type' => 'mobile',
-            'status' => 999, // Custom status for no live coverage
-            'status_text' => 'No Live Coverage',
-            'ported' => false,
-            'present' => 'no',
-            'trxid' => null,
-            'skip_reason' => 'no_live_coverage'
+            'status' => $statusCode,
+            'status_message' => $statusMessage,
         ];
     }
-
-    // 2. Validate credentials
-    if (empty($this->apiKey) || empty($this->apiSecret)) {
-        return $this->handleApiError('TMT API credentials not configured', $phoneNumber, 'Configuration Error');
-    }
-
-    try {
-        // 3. Make the API call
-        $url = "{$this->baseUrl}/format/{$this->apiKey}/{$this->apiSecret}/{$phoneNumber}";
-        Log::info('TMT API Request - cache miss', ['phone' => $phoneNumber]);
-        $response = Http::get($url);
-
-        // 4. Handle unsuccessful HTTP responses (e.g., 404, 500)
-        if (!$response->successful()) {
-            return $this->handleApiError(
-                'API request failed with status: ' . $response->status(),
-                $phoneNumber,
-                'API Error',
-                ['status' => $response->status(), 'response' => $response->body()]
-            );
-        }
-
-        $data = $response->json();
-
-        // 5. Handle cases where the API returns an empty but successful response
-        if (empty($data)) {
-            return $this->handleApiError(
-                'API returned an empty response. Please check API credentials.',
-                $phoneNumber,
-                'Empty API Response'
-            );
-        }
-
-        // 6. Format the data and persist it if the verification was successful
-        $result = $this->formatResponse($data);
-
-        if ($result['success']) {
-            $this->saveResult($result);
-        }
-
-        return $result;
-
-    } catch (Exception $e) {
-        // 7. Catch any other exceptions (e.g., network connection issues)
-        return $this->handleApiError($e->getMessage(), $phoneNumber, 'Exception Error');
-    }
-}
-
-/**
- * Saves a successful verification result to the database and caches it.
- *
- * @param array $resultData The formatted verification data.
- * @return void
- */
-private function saveResult(array $resultData)
-{
-    try {
-        // Use updateOrCreate to find a record by 'number' and update it,
-        // or create a new one if it doesn't exist. This prevents duplicates.
-        $verification = Verification::updateOrCreate(
-            ['number' => $resultData['number']], // <-- Attribute to find the record by
-            $resultData                          // <-- Values to update or create with
-        );
-
-        // Cache the newly updated or created model instance
-        $cacheKey = 'phone_verification:' . $resultData['number'];
-        Cache::put($cacheKey, $verification, now()->addHour());
-        Log::info('Verification result saved and cached.', ['phone' => $resultData['number']]);
-
-    } catch (Exception $e) {
-        Log::error('Failed to save or cache verification result.', [
-            'phone' => $resultData['number'],
-            'error' => $e->getMessage()
-        ]);
-        // This failure is logged but won't stop the successful API result from being returned.
-    }
-}
-
-/**
- * Standardizes API error logging and response format.
- *
- * @param string $errorMessage The primary error message for the user.
- * @param string $phoneNumber The phone number related to the error.
- * @param string $statusMessage A short status code for the error type.
- * @param array $logContext Additional context for server logs.
- * @param int $statusCode The internal status code.
- * @return array The formatted error response.
- */
-private function handleApiError(string $errorMessage, string $phoneNumber, string $statusMessage, array $logContext = [], int $statusCode = 1)
-{
-    Log::error($errorMessage, array_merge(['phone' => $phoneNumber], $logContext));
-
-    return [
-        'success' => false,
-        'error' => $errorMessage,
-        'phone_number' => $phoneNumber,
-        'status' => $statusCode,
-        'status_message' => $statusMessage,
-    ];
-}
 
     private function forceFresh($dataFreshness)
     {
@@ -387,199 +416,188 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
     }
 
     /**
-     * Check network prefix for a phone number
+     * Match country code from phone number using cached patterns
      */
-    public function checkNetworkPrefix($phoneNumber)
+    private function matchCountryCode(string $cleanNumber): ?array
+    {
+        $patterns = Cache::remember('country_code_patterns', 86400, function () {
+            return [
+                // 4-digit prefixes (check first for specificity)
+                '1200' => ['code' => '1', 'country' => 'United States'],
+                '1202' => ['code' => '1', 'country' => 'United States'],
+                '4474' => ['code' => '44', 'country' => 'United Kingdom'],
+                '4914' => ['code' => '49', 'country' => 'Germany'],
+                '4917' => ['code' => '49', 'country' => 'Germany'],
+                '5510' => ['code' => '55', 'country' => 'Brazil'],
+                '5521' => ['code' => '55', 'country' => 'Brazil'],
+                '6139' => ['code' => '61', 'country' => 'Australia'],
+                '6141' => ['code' => '61', 'country' => 'Australia'],
+                '6680' => ['code' => '66', 'country' => 'Thailand'],
+                '6689' => ['code' => '66', 'country' => 'Thailand'],
+                '7899' => ['code' => '7', 'country' => 'Russia'],
+                '7901' => ['code' => '7', 'country' => 'Russia'],
+                '8179' => ['code' => '81', 'country' => 'Japan'],
+                '8190' => ['code' => '81', 'country' => 'Japan'],
+                '9190' => ['code' => '91', 'country' => 'India'],
+                '9194' => ['code' => '91', 'country' => 'India'],
+
+                // 3-digit prefixes
+                '855' => ['code' => '855', 'country' => 'Cambodia'],
+                '446' => ['code' => '44', 'country' => 'United Kingdom'],
+                '335' => ['code' => '33', 'country' => 'France'],
+                '337' => ['code' => '33', 'country' => 'France'],
+
+                // 2-digit prefixes
+                '33' => ['code' => '33', 'country' => 'France'],
+                '44' => ['code' => '44', 'country' => 'United Kingdom'],
+                '49' => ['code' => '49', 'country' => 'Germany'],
+                '55' => ['code' => '55', 'country' => 'Brazil'],
+                '61' => ['code' => '61', 'country' => 'Australia'],
+                '66' => ['code' => '66', 'country' => 'Thailand'],
+                '81' => ['code' => '81', 'country' => 'Japan'],
+                '91' => ['code' => '91', 'country' => 'India'],
+
+                // 1-digit prefixes
+                '1' => ['code' => '1', 'country' => 'United States'],
+                '7' => ['code' => '7', 'country' => 'Russia'],
+            ];
+        });
+
+        for ($length = 4; $length >= 1; $length--) {
+            $prefix = substr($cleanNumber, 0, $length);
+
+            if (isset($patterns[$prefix])) {
+                return $patterns[$prefix];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Check network prefix for a phone number - OPTIMIZED VERSION
+     */
+    public function checkNetworkPrefix(string $phoneNumber): array
     {
         try {
             // Clean the phone number
             $cleanNumber = preg_replace('/[^0-9]/', '', $phoneNumber);
 
             if (empty($cleanNumber)) {
-                return [
-                    'success' => false,
-                    'error' => 'Invalid phone number format'
-                ];
+                return $this->errorResponse('Invalid phone number format');
             }
 
-            // NEW STRATEGY: Only show country when we find a valid country code prefix
-            $networkPrefix = null;
+            // Match country code
+            $countryMatch = $this->matchCountryCode($cleanNumber);
 
-            // Check for specific country codes using simple if statements
-            $matchedCountryCode = null;
-            $matchedCountry = null;
-
-            // Check if input starts with any country code (longest match first)
-            if (str_starts_with($cleanNumber, '855')) {
-                $matchedCountryCode = '855';
-                $matchedCountry = 'Cambodia';
-            } elseif (str_starts_with($cleanNumber, '1201') || str_starts_with($cleanNumber, '1202')) {
-                $matchedCountryCode = '1';
-                $matchedCountry = 'United States';
-            } elseif (str_starts_with($cleanNumber, '4475')) {
-                $matchedCountryCode = '44';
-                $matchedCountry = 'United Kingdom';
-            } elseif (str_starts_with($cleanNumber, '4915') || str_starts_with($cleanNumber, '4917')) {
-                $matchedCountryCode = '49';
-                $matchedCountry = 'Germany';
-            } elseif (str_starts_with($cleanNumber, '5511') || str_starts_with($cleanNumber, '5521')) {
-                $matchedCountryCode = '55';
-                $matchedCountry = 'Brazil';
-            } elseif (str_starts_with($cleanNumber, '6140') || str_starts_with($cleanNumber, '6141')) {
-                $matchedCountryCode = '61';
-                $matchedCountry = 'Australia';
-            } elseif (str_starts_with($cleanNumber, '6681') || str_starts_with($cleanNumber, '6689')) {
-                $matchedCountryCode = '66';
-                $matchedCountry = 'Thailand';
-            } elseif (str_starts_with($cleanNumber, '7900') || str_starts_with($cleanNumber, '7901')) {
-                $matchedCountryCode = '7';
-                $matchedCountry = 'Russia';
-            } elseif (str_starts_with($cleanNumber, '8180') || str_starts_with($cleanNumber, '8190')) {
-                $matchedCountryCode = '81';
-                $matchedCountry = 'Japan';
-            } elseif (str_starts_with($cleanNumber, '9191') || str_starts_with($cleanNumber, '9194')) {
-                $matchedCountryCode = '91';
-                $matchedCountry = 'India';
-            } elseif (str_starts_with($cleanNumber, '447')) {
-                $matchedCountryCode = '44';
-                $matchedCountry = 'United Kingdom';
-            } elseif (str_starts_with($cleanNumber, '336') || str_starts_with($cleanNumber, '337')) {
-                $matchedCountryCode = '33';
-                $matchedCountry = 'France';
-            } elseif ($cleanNumber === '1') {
-                $matchedCountryCode = '1';
-                $matchedCountry = 'United States';
-            } elseif ($cleanNumber === '33') {
-                $matchedCountryCode = '33';
-                $matchedCountry = 'France';
-            } elseif ($cleanNumber === '44') {
-                $matchedCountryCode = '44';
-                $matchedCountry = 'United Kingdom';
-            } elseif ($cleanNumber === '49') {
-                $matchedCountryCode = '49';
-                $matchedCountry = 'Germany';
-            } elseif ($cleanNumber === '55') {
-                $matchedCountryCode = '55';
-                $matchedCountry = 'Brazil';
-            } elseif ($cleanNumber === '61') {
-                $matchedCountryCode = '61';
-                $matchedCountry = 'Australia';
-            } elseif ($cleanNumber === '66') {
-                $matchedCountryCode = '66';
-                $matchedCountry = 'Thailand';
-            } elseif ($cleanNumber === '7') {
-                $matchedCountryCode = '7';
-                $matchedCountry = 'Russia';
-            } elseif ($cleanNumber === '81') {
-                $matchedCountryCode = '81';
-                $matchedCountry = 'Japan';
-            } elseif ($cleanNumber === '855') {
-                $matchedCountryCode = '855';
-                $matchedCountry = 'Cambodia';
-            } elseif ($cleanNumber === '91') {
-                $matchedCountryCode = '91';
-                $matchedCountry = 'India';
+            if (!$countryMatch) {
+                return $this->errorResponse('Country code not recognized');
             }
 
-            // Once we have a country code, always try to find the best prefix match
-            if ($matchedCountryCode) {
-                // Find the longest exact prefix match
-                for ($i = min(9, strlen($cleanNumber)); $i >= 1; $i--) {
-                    $prefix = substr($cleanNumber, 0, $i);
-                    $match = \App\Models\NetworkPrefix::where('prefix', $prefix)->first();
-                    if ($match) {
-                        $networkPrefix = $match;
-                        break;
-                    }
-                }
+            $possiblePrefixes = $this->generatePrefixes($cleanNumber, 9);
 
-                // If we found a specific network prefix, return detailed info
-                if ($networkPrefix) {
-                    $numberLength = strlen($cleanNumber);
-                    $isPartialMatch = ($numberLength < $networkPrefix->min_length);
+            $networkPrefix = NetworkPrefix::whereIn('prefix', $possiblePrefixes)
+                ->orderByRaw('LENGTH(prefix) DESC')
+                ->first();
 
-                    return [
-                        'success' => true,
-                        'prefix' => $networkPrefix->prefix,
-                        'country_name' => $networkPrefix->country_name,
-                        'network_name' => $networkPrefix->network_name,
-                        'mcc' => $networkPrefix->mcc,
-                        'mnc' => $networkPrefix->mnc,
-                        'live_coverage' => $networkPrefix->live_coverage,
-                        'min_length' => $networkPrefix->min_length,
-                        'max_length' => $networkPrefix->max_length,
-                        'partial_match' => $isPartialMatch,
-                        'current_length' => $numberLength
-                    ];
-                }
-
-                // If we only have the country code but no specific network prefix yet
-                $countryPrefixes = \App\Models\NetworkPrefix::where('country_name', $matchedCountry)->get();
-                $uniqueNetworks = $countryPrefixes->pluck('network_name')->unique();
-
-                return [
-                    'success' => true,
-                    'partial_match' => true,
-                    'prefix' => $matchedCountryCode,
-                    'country_name' => $matchedCountry,
-                    'network_name' => $uniqueNetworks->count() == 1 ? $uniqueNetworks->first() : 'Multiple Networks',
-                    'live_coverage' => $countryPrefixes->where('live_coverage', true)->count() > 0,
-                    'min_length' => $countryPrefixes->min('min_length'),
-                    'max_length' => $countryPrefixes->max('max_length'),
-                    'current_length' => strlen($cleanNumber),
-                    'potential_matches' => $countryPrefixes->count(),
-                    'suggested_length' => $countryPrefixes->first()->min_length
-                ];
+            if ($networkPrefix) {
+                return $this->buildNetworkResponse($networkPrefix, $cleanNumber);
             }
 
-            // If we still don't have a network prefix, check if we should return error
-            if (!$networkPrefix) {
-                return [
-                    'success' => false,
-                    'error' => 'Network prefix not found in database'
-                ];
-            }
-
-            // Check if the number length is within the expected range
-            $numberLength = strlen($cleanNumber);
-            $isPartialMatch = false;
-
-            if ($numberLength < $networkPrefix->min_length) {
-                // Number is too short - partial match
-                $isPartialMatch = true;
-            } elseif ($numberLength > $networkPrefix->max_length) {
-                // Number is too long
-                return [
-                    'success' => false,
-                    'error' => 'Phone number too long for this network'
-                ];
-            }
-
-            return [
-                'success' => true,
-                'prefix' => $networkPrefix->prefix,
-                'country_name' => $networkPrefix->country_name,
-                'network_name' => $networkPrefix->network_name,
-                'mcc' => $networkPrefix->mcc,
-                'mnc' => $networkPrefix->mnc,
-                'live_coverage' => $networkPrefix->live_coverage,
-                'min_length' => $networkPrefix->min_length,
-                'max_length' => $networkPrefix->max_length,
-                'partial_match' => $isPartialMatch,
-                'current_length' => $numberLength
-            ];
-
+            // Otherwise return country-level data
+            return $this->buildCountryResponse($countryMatch, $cleanNumber);
         } catch (\Exception $e) {
             Log::error('Error in checkNetworkPrefix', [
                 'phone' => $phoneNumber,
                 'error' => $e->getMessage()
             ]);
 
-            return [
-                'success' => false,
-                'error' => 'Error checking network prefix: ' . $e->getMessage()
-            ];
+            return $this->errorResponse('Error checking network prefix: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Generate all possible prefix combinations for a phone number
+     * 
+     * @param string $phoneNumber The phone number
+     * @param int $maxLength Maximum prefix length to check
+     * @return array Array of prefixes from longest to shortest
+     */
+    private function generatePrefixes(string $phoneNumber, int $maxLength = 9): array
+    {
+        $prefixes = [];
+        $length = min($maxLength, strlen($phoneNumber));
+
+        for ($i = $length; $i >= 1; $i--) {
+            $prefixes[] = substr($phoneNumber, 0, $i);
+        }
+
+        return $prefixes;
+    }
+
+    /**
+     * Build response for found network
+     */
+    private function buildNetworkResponse(\App\Models\NetworkPrefix $networkPrefix, string $cleanNumber): array
+    {
+        $numberLength = strlen($cleanNumber);
+        $isPartialMatch = $numberLength < $networkPrefix->min_length;
+
+        return [
+            'success' => true,
+            'prefix' => $networkPrefix->prefix,
+            'country_name' => $networkPrefix->country_name,
+            'network_name' => $networkPrefix->network_name,
+            'mcc' => $networkPrefix->mcc,
+            'mnc' => $networkPrefix->mnc,
+            'live_coverage' => $networkPrefix->live_coverage,
+            'min_length' => $networkPrefix->min_length,
+            'max_length' => $networkPrefix->max_length,
+            'partial_match' => $isPartialMatch,
+            'current_length' => $numberLength
+        ];
+    }
+
+    /**
+     * Build response for country-level match (no specific network found)
+     */
+    private function buildCountryResponse(array $countryMatch, string $cleanNumber): array
+    {
+        $countryPrefixes = \App\Models\NetworkPrefix::where('country_name', $countryMatch['country'])
+            ->get();
+
+        if ($countryPrefixes->isEmpty()) {
+            return $this->errorResponse('Network prefix not found in database');
+        }
+
+        $uniqueNetworks = $countryPrefixes->pluck('network_name')->unique();
+
+        return [
+            'success' => true,
+            'partial_match' => true,
+            'prefix' => $countryMatch['code'],
+            'country_name' => $countryMatch['country'],
+            'network_name' => $uniqueNetworks->count() === 1
+                ? $uniqueNetworks->first()
+                : 'Multiple Networks',
+            'live_coverage' => $countryPrefixes->where('live_coverage', true)->isNotEmpty(),
+            'min_length' => $countryPrefixes->min('min_length'),
+            'max_length' => $countryPrefixes->max('max_length'),
+            'current_length' => strlen($cleanNumber),
+            'potential_matches' => $countryPrefixes->count(),
+            'suggested_length' => $countryPrefixes->first()->min_length ?? null
+        ];
+    }
+
+    /**
+     * Build error response
+     */
+    private function errorResponse(string $message): array
+    {
+        return [
+            'success' => false,
+            'error' => $message
+        ];
     }
 
     /**
@@ -779,19 +797,19 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
     private function preprocessPhoneNumbers(array $phoneNumbers): array
     {
         // Remove empty values
-        $phoneNumbers = array_filter($phoneNumbers, function($phone) {
+        $phoneNumbers = array_filter($phoneNumbers, function ($phone) {
             return !empty(trim($phone));
         });
 
         // Clean and normalize phone numbers
-        $cleanedNumbers = array_map(function($phone) {
+        $cleanedNumbers = array_map(function ($phone) {
             // Remove all non-numeric characters
             $cleaned = preg_replace('/[^0-9]/', '', trim($phone));
             return $cleaned;
         }, $phoneNumbers);
 
         // Remove empty cleaned numbers
-        $cleanedNumbers = array_filter($cleanedNumbers, function($phone) {
+        $cleanedNumbers = array_filter($cleanedNumbers, function ($phone) {
             return !empty($phone) && strlen($phone) >= 3;
         });
 
@@ -886,10 +904,12 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
         foreach ($phoneNumbers as $phoneNumber) {
             $networkCheck = $this->checkNetworkPrefix($phoneNumber);
 
-            if ($networkCheck['success'] &&
+            if (
+                $networkCheck['success'] &&
                 !$networkCheck['partial_match'] &&
                 isset($networkCheck['live_coverage']) &&
-                !$networkCheck['live_coverage']) {
+                !$networkCheck['live_coverage']
+            ) {
 
                 // Create result for unsupported number
                 $unsupportedResults[] = [
@@ -998,7 +1018,6 @@ private function handleApiError(string $errorMessage, string $phoneNumber, strin
                     $results[] = $result;
                 }
             }
-
         } catch (\Exception $e) {
             // Handle general API error - fallback to individual calls
             Log::error('Concurrent API calls failed, falling back to individual calls', [

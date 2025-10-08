@@ -166,10 +166,21 @@ Route::view('others/search-result', 'others.search-result')->name('search-result
 
 // Route::get('/home', 'HomeController@index')->name('home');
 
-Route::get('verification', 'App\Http\Controllers\VerificationController@index')->name('verification.index');
-    Route::post('verification/check', 'App\Http\Controllers\VerificationController@checkNetworkPrefix')->name('verification.check');
-    Route::post('verification/verify', 'App\Http\Controllers\VerificationController@verify')->name('verification.verify');
-    Route::post('verification/batch', 'App\Http\Controllers\VerificationController@verifyBatch')->name('verification.batch');
-    Route::get('verification/export', 'App\Http\Controllers\VerificationController@export')->name('verification.export');
-    Route::get('verification/stats', 'App\Http\Controllers\VerificationController@stats')->name('verification.stats');
+// Route::get('verification', 'App\Http\Controllers\VerificationController@index')->name('verification.index');
+//     Route::post('verification/check', 'App\Http\Controllers\VerificationController@checkNetworkPrefix')->name('verification.check');
+//     Route::post('verification/verify', 'App\Http\Controllers\VerificationController@verify')->name('verification.verify');
+//     Route::post('verification/batch', 'App\Http\Controllers\VerificationController@verifyBatch')->name('verification.batch');
+//     Route::get('verification/export', 'App\Http\Controllers\VerificationController@export')->name('verification.export');
+//     Route::get('verification/stats', 'App\Http\Controllers\VerificationController@stats')->name('verification.stats');
+
+use App\Http\Controllers\PhoneVerificationController;
+
+Route::get('verification', [PhoneVerificationController::class, 'index'])->name('verification.index');
+Route::post('verification/check', [PhoneVerificationController::class, 'checkNetworkPrefix'])->name('verification.check');
+Route::post('verification/verify', [PhoneVerificationController::class, 'verify'])->name('verification.verify');
+Route::post('verification/batch', [PhoneVerificationController::class, 'verifyBatch'])->name('verification.batch');
+Route::get('verification/export', [PhoneVerificationController::class, 'export'])->name('verification.export');
+Route::get('verification/{id}', [PhoneVerificationController::class, 'getVerification'])->name('verification.show');
+Route::get('verification/history', [PhoneVerificationController::class, 'history'])->name('verification.history');
+Route::get('verification/statistics', [PhoneVerificationController::class, 'statistics'])->name('verification.statistics');
 
