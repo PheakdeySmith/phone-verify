@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('base_url');
             $table->string('api_key');
+            $table->string('api_secret')->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->integer('priority')->default(1);
             $table->decimal('default_price', 10, 6)->default(0.005);

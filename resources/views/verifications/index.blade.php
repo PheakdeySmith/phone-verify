@@ -9,18 +9,15 @@
 @section('main-content')
     <div class="breadcrumb d-flex justify-content-between align-items-center">
         <div>
-            <h1>Phone Number</h1>
+            <h1>Phone Number Verification</h1>
             <ul class="mb-0">
-                <li><a href="">Form</a></li>
+                <li><a href="">Dashboard</a></li>
                 <li>Verification</li>
             </ul>
         </div>
         <div class="d-flex gap-2">
             <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#filterModal" id="filterBtn">
                 <i class="nav-icon me-2 i-Filter-2"></i> <span id="filterCount" class="badge badge-light d-none">0</span>
-            </button>
-            <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#verify">
-                <i class="fas fa-plus"></i> Enter Number
             </button>
             <button type="button" class="btn btn-secondary" data-toggle="modal" data-target="#upload">
                 <i class="fas fa-upload"></i> Import Files
@@ -43,15 +40,101 @@
         <!-- Card content will be dynamically inserted here -->
     </div>
 
-    <div class="row">
+    <!-- Phone Verification Input and Results Row -->
+    <div class="row mb-4">
+        <!-- Left Side - Input Form -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <form id="verifyForm">
+                        @csrf
+                        <div class="mb-3">
+                            <label for="phone_number_main" class="col-form-label">Enter Phone Number</label>
+                            <div class="input-group">
+                                <input type="tel" class="form-control" id="phone_number_main" name="phone_number"
+                                    placeholder="e.g., 85592313242" required>
+                                <button type="button" class="btn btn-primary" id="verifyBtnMain">
+                                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                    Verify
+                                </button>
+                            </div>
+                             <div class="text-danger small" id="phone-error-main" style="display: none;"></div>
+                        </div>
+
+                        <!-- Phone Validation Info -->
+                        <div class="mb-3" id="phone-validation-info-main" style="display: none;">
+                            <div class="alert mb-0" id="validation-alert-main">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <strong>Detected:</strong> <span id="detected-info-main"></span>
+                                    </div>
+                                    <div class="col-md-4 text-end" hidden>
+                                        <strong>Coverage:</strong> <span id="coverage-status-main"></span>
+                                    </div>
+                                </div>
+                                <div class="row mt-2" id="cost-info-main" style="display: none;">
+                                    <div class="col-12">
+                                        <strong>Estimated Cost:</strong> <span id="cost-amount-main"
+                                            class="badge bg-primary"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Query Type Selection -->
+                        <div class="mb-3">
+                            <label class="col-form-label">Query Type</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="query_type_main" id="basic_query_main"
+                                    value="basic" checked>
+                                <label class="form-check-label" for="basic_query_main">
+                                    <strong>BASIC Query</strong> <small class="text-muted">(FREE)</small>
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="query_type_main" id="advanced_query_main"
+                                    value="advanced">
+                                <label class="form-check-label" for="advanced_query_main">
+                                    <strong>ADVANCED Query</strong> <small class="text-muted">(PAID)</small>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Options -->
+                        <div class="mb-3" id="advanced-options-main" style="display: none;">
+                            <label for="data_freshness_main" class="col-form-label">Data Freshness</label>
+                            <select class="form-control" id="data_freshness_main" name="data_freshness">
+                                <option value="">Cached (recommended)</option>
+                                <option value="30">Refresh after 30 days</option>
+                                <option value="60">Refresh after 60 days</option>
+                                <option value="90">Refresh after 90 days</option>
+                                <option value="all">Always fresh</option>
+                            </select>
+                         </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side - Results Display -->
+        <div class="col-md-6">
+            <div id="verification-result-main" style="display: none;">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <div class="row" id="verification-table-container" style="display: none;">
         <div class="col-md-12">
             <div class="card">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h4 class="card-title mb-0"><i class="fas fa-table"></i> Network Prefix Verification Table</h4>
-                        <a href="{{ route('verification.export') }}" class="btn btn-outline-primary btn-sm">
-                            <i class="fas fa-download"></i> Export to Excel
-                        </a>
+                        <div class="d-flex gap-2">
+                            <a href="{{ route('verification.export') }}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-download"></i> Export to Excel
+                            </a>
+                        </div>
                     </div>
                     <div class="table-responsive">
                         <table id="network_verification_table" class="display table table-striped table-bordered"
@@ -81,56 +164,6 @@
         </div>
     </div>
 
-    <!-- Modal -->
-    <div class="modal fade" id="verify" tabindex="-1" role="dialog" aria-labelledby="verifyLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="verifyLabel">Smart Phone Number Verification</h5>
-                </div>
-                <div class="modal-body">
-                    <form id="verifyForm">
-                        @csrf
-                        <div class="mb-3">
-                            <label for="phone_number" class="col-form-label">Enter Phone Number</label>
-                            <input type="tel" class="form-control" id="phone_number" name="phone_number"
-                                placeholder="e.g., 85592313242" required>
-                            <div class="form-text">Enter the full phone number including country code</div>
-                            <div id="phone-validation-info" class="mt-2" style="display: none;">
-                                <div class="alert mb-0" id="validation-alert">
-                                    <div id="network-info">
-                                        <strong>Network Detected:</strong> <span id="detected-info"></span>
-                                    </div>
-                                    <div id="coverage-info" class="mt-1">
-                                        <strong>Live Coverage:</strong> <span id="coverage-status"></span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="invalid-feedback" id="phone-error"></div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="data_freshness" class="col-form-label">Data Freshness</label>
-                            <select class="form-control" id="data_freshness" name="data_freshness">
-                                <option value="">Use cached data if available (recommended)</option>
-                                <option value="30">Force refresh if data is older than 30 days</option>
-                                <option value="60">Force refresh if data is older than 60 days</option>
-                                <option value="90">Force refresh if data is older than 90 days</option>
-                                <option value="all">Always get fresh data from API</option>
-                            </select>
-                            <div class="form-text">Select when to fetch fresh data from the API vs using cached results</div>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                    <button type="button" class="btn btn-primary" id="verifyBtn">
-                        <span class="spinner-border spinner-border-sm d-none" role="status"></span>
-                        Verify
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <div class="modal fade" id="upload" tabindex="-1" role="dialog" aria-labelledby="uploadLabel" aria-hidden="true">
         <div class="modal-dialog" role="document">
@@ -142,7 +175,8 @@
                     <div class="mb-3">
                         <label for="file-upload" class="form-label">Upload Excel File</label>
                         <input type="file" class="form-control" id="file-upload" accept=".xlsx,.xls,.csv" required>
-                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the first column</div>
+                        <div class="form-text">Upload an Excel file (.xlsx, .xls) or CSV file with phone numbers in the
+                            first column</div>
                         <div class="invalid-feedback" id="batch-error"></div>
                     </div>
                     <div class="mb-3" id="file-preview" style="display: none;">
@@ -162,15 +196,15 @@
                     <div class="mb-3">
                         <label for="batch_data_freshness" class="form-label">Data Freshness</label>
                         <select class="form-control" id="batch_data_freshness" name="batch_data_freshness">
-                            <option value="">Use cached data if available (recommended)</option>
-                            <option value="30">Force refresh if data is older than 30 days</option>
-                            <option value="60">Force refresh if data is older than 60 days</option>
-                            <option value="90">Force refresh if data is older than 90 days</option>
-                            <option value="all">Verify All Fresh (bypass cache & database)</option>
+                            <option value="">Cached (recommended)</option>
+                            <option value="30">Refresh after 30 days</option>
+                            <option value="60">Refresh after 60 days</option>
+                            <option value="90">Refresh after 90 days</option>
+                            <option value="all">Always fresh</option>
                         </select>
                         <div class="form-text">
-                            <strong>Fresh Verification:</strong> Numbers with live coverage will be verified with fresh API calls.
-                            Numbers without live coverage will be skipped to save costs and only checked against local database.
+                            <strong>Fresh Verification:</strong> Numbers with live coverage will be verified with fresh API
+                            calls.
                         </div>
                     </div>
                 </div>
@@ -262,107 +296,107 @@
             const cachePercent = data.processed > 0 ? Math.round((totalCached / data.processed) * 100) : 0;
 
             const resultsHtml = `
-                <div id="batch-results-card" class="card mb-4" style="border: 1px solid #ddd;">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="card-title mb-0">Batch Verification Results</h5>
-                            <button type="button" class="btn-close" onclick="document.getElementById('batch-results-card').remove()" style="background: none; border: none; font-size: 18px;">&times;</button>
-                        </div>
+                    <div id="batch-results-card" class="card mb-4" style="border: 1px solid #ddd;">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title mb-0">Batch Verification Results</h5>
+                                <button type="button" class="btn-close" onclick="document.getElementById('batch-results-card').remove()" style="background: none; border: none; font-size: 18px;">&times;</button>
+                            </div>
 
-                        <!-- Main Statistics Row -->
-                        <div class="row mb-3">
-                            <div class="col-md-3">
-                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #333;">${data.processed}</div>
-                                    <div style="font-size: 14px; color: #666;">Total Processed</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #28a745;">${liveCoverageCount}</div>
-                                    <div style="font-size: 14px; color: #666;">Live Coverage</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #ffc107;">${noCoverageCount}</div>
-                                    <div style="font-size: 14px; color: #666;">No Coverage</div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
-                                    <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: ${errorCount > 0 ? '#dc3545' : '#6c757d'};">${errorCount}</div>
-                                    <div style="font-size: 14px; color: #666;">Errors</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Data Source Statistics -->
-                        <div class="row mb-3">
-                            <div class="col-md-4">
-                                <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
-                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #007bff;">${totalCached}</div>
-                                    <div style="font-size: 14px; color: #666;">From Cache/DB</div>
-                                    <div style="font-size: 12px; color: #999;">${cachePercent}% cache hit</div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
-                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #17a2b8;">${cacheHits}</div>
-                                    <div style="font-size: 14px; color: #666;">Redis Cache</div>
-                                    <div style="font-size: 12px; color: #999;">Fast retrieval</div>
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
-                                    <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #6f42c1;">${dbHits}</div>
-                                    <div style="font-size: 14px; color: #666;">Database</div>
-                                    <div style="font-size: 12px; color: #999;">Historical data</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- API Calls and Performance -->
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <div style="font-weight: 500; margin-bottom: 8px; color: #333;">API Performance</div>
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span style="color: #666;">New API Calls:</span>
-                                        <span style="font-weight: 500; color: #333;">${apiCalls}</span>
+                            <!-- Main Statistics Row -->
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #333;">${data.processed}</div>
+                                        <div style="font-size: 14px; color: #666;">Total Processed</div>
                                     </div>
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <span style="color: #666;">Cache Hit Rate:</span>
-                                        <span style="font-weight: 500; color: #333;">${cachePercent}%</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #28a745;">${liveCoverageCount}</div>
+                                        <div style="font-size: 14px; color: #666;">Live Coverage</div>
                                     </div>
-                                    <div class="d-flex justify-content-between">
-                                        <span style="color: #666;">Coverage Rate:</span>
-                                        <span style="font-weight: 500; color: #333;">${liveCoveragePercent}%</span>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: #ffc107;">${noCoverageCount}</div>
+                                        <div style="font-size: 14px; color: #666;">No Coverage</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="text-center p-3" style="border: 1px solid #eee; border-radius: 8px;">
+                                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px; color: ${errorCount > 0 ? '#dc3545' : '#6c757d'};">${errorCount}</div>
+                                        <div style="font-size: 14px; color: #666;">Errors</div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div>
-                                    <div style="font-weight: 500; margin-bottom: 8px; color: #333;">Cost Optimization</div>
-                                    <div style="font-size: 14px; color: #666;">
-                                        <div class="mb-1">${noCoverageCount} API calls saved (no coverage)</div>
-                                        <div class="mb-1">${totalCached} cached results reused</div>
-                                        <div>${apiCalls} fresh verifications made</div>
+
+                            <!-- Data Source Statistics -->
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                        <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #007bff;">${totalCached}</div>
+                                        <div style="font-size: 14px; color: #666;">From Cache/DB</div>
+                                        <div style="font-size: 12px; color: #999;">${cachePercent}% cache hit</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                        <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #17a2b8;">${cacheHits}</div>
+                                        <div style="font-size: 14px; color: #666;">Redis Cache</div>
+                                        <div style="font-size: 12px; color: #999;">Fast retrieval</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="text-center p-3" style="background: #f8f9fa; border-radius: 8px;">
+                                        <div style="font-size: 20px; font-weight: bold; margin-bottom: 4px; color: #6f42c1;">${dbHits}</div>
+                                        <div style="font-size: 14px; color: #666;">Database</div>
+                                        <div style="font-size: 12px; color: #999;">Historical data</div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        ${data.cache_message ? `
-                        <div class="mt-3 pt-3" style="border-top: 1px solid #eee;">
-                            <div style="font-size: 13px; color: #666; font-style: italic;">
-                                ${data.cache_message}
+                            <!-- API Calls and Performance -->
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <div style="font-weight: 500; margin-bottom: 8px; color: #333;">API Performance</div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span style="color: #666;">New API Calls:</span>
+                                            <span style="font-weight: 500; color: #333;">${apiCalls}</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span style="color: #666;">Cache Hit Rate:</span>
+                                            <span style="font-weight: 500; color: #333;">${cachePercent}%</span>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span style="color: #666;">Coverage Rate:</span>
+                                            <span style="font-weight: 500; color: #333;">${liveCoveragePercent}%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div>
+                                        <div style="font-weight: 500; margin-bottom: 8px; color: #333;">Cost Optimization</div>
+                                        <div style="font-size: 14px; color: #666;">
+                                            <div class="mb-1">${noCoverageCount} API calls saved (no coverage)</div>
+                                            <div class="mb-1">${totalCached} cached results reused</div>
+                                            <div>${apiCalls} fresh verifications made</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+
+                            ${data.cache_message ? `
+                            <div class="mt-3 pt-3" style="border-top: 1px solid #eee;">
+                                <div style="font-size: 13px; color: #666; font-style: italic;">
+                                    ${data.cache_message}
+                                </div>
+                            </div>
+                            ` : ''}
                         </div>
-                        ` : ''}
                     </div>
-                </div>
-            `;
+                `;
 
             // Insert the results card after the alert container
             const alertContainer = document.getElementById('alert-container');
@@ -372,6 +406,288 @@
         function hideAlert() {
             const alertContainer = document.getElementById('alert-container');
             alertContainer.style.display = 'none';
+        }
+
+        // Show advanced verification results in main panel
+        function showVerificationCardMain(verificationData) {
+            const resultContainer = document.getElementById('verification-result-main');
+
+            // Determine the provider and map fields accordingly
+            const provider = verificationData.provider;
+            let valid, present, country, fraudScore;
+
+            if (provider === 'TMT') {
+                // TMT mapping - country comes from coverage data, not API response
+                valid = verificationData.tmt_status !== undefined ? (verificationData.tmt_status === 0 ? true : false) : null;
+                present = verificationData.tmt_present || null;
+                // Get country from coverage data passed back from service
+                country = verificationData.coverage_country_name || verificationData.coverage_country || 'N/A';
+                fraudScore = 'N/A'; // TMT doesn't provide fraud scores
+            } else if (provider === 'IPQS') {
+                // IPQS mapping
+                valid = verificationData.ipqs_valid || null;
+                present = verificationData.ipqs_active !== undefined ? (verificationData.ipqs_active ? 'yes' : 'no') : null;
+                country = verificationData.ipqs_country || null;
+                fraudScore = verificationData.ipqs_fraud_score || null;
+            } else {
+                // Fallback for unknown providers
+                valid = verificationData.ipqs_valid || (verificationData.tmt_status !== undefined ? (verificationData.tmt_status === 0) : null);
+                present = verificationData.tmt_present || (verificationData.ipqs_active !== undefined ? (verificationData.ipqs_active ? 'yes' : 'no') : null);
+                country = verificationData.ipqs_country || verificationData.tmt_country || null;
+                fraudScore = verificationData.ipqs_fraud_score || null;
+            }
+
+            const data = {
+                number: verificationData.phone_number || verificationData.number || 'N/A',
+                provider: provider || 'Unknown',
+                valid: valid,
+                present: present,
+                fraud_score: fraudScore,
+                network: verificationData.tmt_network || verificationData.ipqs_carrier || null,
+                country: country,
+                status: verificationData.tmt_status !== undefined ? (verificationData.tmt_status === 0 ? 'Success' : 'Failed') : 'Unknown',
+                ported: verificationData.tmt_ported !== undefined ? (verificationData.tmt_ported ? 'Yes' : 'No') : 'N/A',
+                mcc: verificationData.tmt_mcc || 'N/A',
+                mnc: verificationData.tmt_mnc || 'N/A',
+                prefix: verificationData.tmt_prefix || 'N/A',
+                cost: verificationData.cost ? '$' + parseFloat(verificationData.cost).toFixed(6) : 'N/A',
+                created_at: verificationData.created_at || null
+            };
+
+            const cardHtml = `
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-phone-alt me-2"></i>
+                                Advanced Result (${data.provider})
+                            </h5>
+                        </div>
+                        <div class="card-body">
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="mb-2 text-dark">Basic Information</h6>
+
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Phone Number:</strong>
+                                        <span>${data.number}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Provider:</strong>
+                                        <span>${data.provider}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Status:</strong>
+                                        <span>${data.status}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Valid:</strong>
+                                        <span>${data.valid !== null ? (data.valid ? 'Yes' : 'No') : 'N/A'}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Present:</strong>
+                                        <span>${data.present ? data.present.charAt(0).toUpperCase() + data.present.slice(1) : 'N/A'}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <strong>Cost:</strong>
+                                        <span>${data.cost}</span>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6 mb-3">
+                                    <h6 class="mb-2 text-dark">Network Information</h6>
+
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Network:</strong>
+                                        <span>${data.network || 'N/A'}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Country:</strong>
+                                        <span>${data.country || 'N/A'}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Prefix:</strong>
+                                        <span>${data.prefix}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>MCC/MNC:</strong>
+                                        <span>${data.mcc}/${data.mnc}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 border-bottom">
+                                        <strong>Ported:</strong>
+                                        <span>${data.ported}</span>
+                                    </div>
+                                    ${data.fraud_score !== 'N/A' ? `
+                                    <div class="d-flex justify-content-between mb-1">
+                                        <strong>Fraud Score:</strong>
+                                        <span>${data.fraud_score}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+
+                            <div class="border-top pt-2">
+                                <div class="d-flex justify-content-between">
+                                    <strong>Verified At:</strong>
+                                    <span class="text-muted">${data.created_at ? new Date(data.created_at).toLocaleString() : 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            resultContainer.innerHTML = cardHtml;
+            resultContainer.style.display = 'block';
+        }
+
+        // Show basic query results in main panel
+        function showBasicQueryResultsMain(data) {
+            const resultContainer = document.getElementById('verification-result-main');
+
+            const cardHtml = `
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-search me-2"></i>
+                                Basic Result
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <strong>Phone Number:</strong>
+                                <span>${data.phone_number}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <strong>Supported:</strong>
+                                <span>${data.supported ? 'Yes' : 'No'}</span>
+                            </div>
+                            ${data.coverage_info && data.coverage_info.country ? `
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <strong>Country:</strong>
+                                <span>${data.coverage_info.country}</span>
+                            </div>
+                            ` : ''}
+                            ${data.coverage_info && data.coverage_info.country_code ? `
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <strong>Dialing Code:</strong>
+                                <span>+${data.coverage_info.country_code}</span>
+                            </div>
+                            ` : ''}
+                            ${data.coverage_info && (data.coverage_info.network_name || data.coverage_info.carrier_name) ? `
+                            <div class="d-flex justify-content-between mb-2 pb-1 border-bottom">
+                                <strong>Network/Carrier:</strong>
+                                <span>${data.coverage_info.network_name || data.coverage_info.carrier_name}</span>
+                            </div>
+                            ` : ''}
+                            ${data.coverage_info && (data.coverage_info.live_coverage !== undefined || data.coverage_info.support_provider !== undefined) ? `
+                            <div class="d-flex justify-content-between mb-2 pb-1">
+                                <strong>Status:</strong>
+                                <span>${(data.coverage_info.live_coverage || data.coverage_info.support_provider) ? 'Active' : 'Inactive'}</span>
+                            </div>
+                            ` : ''}
+
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="p-2 border rounded"> 
+                                    <i class="fas fa-info-circle me-2 text-dark"></i>
+                                    <strong>Note:</strong> ${data.note}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            resultContainer.innerHTML = cardHtml;
+            resultContainer.style.display = 'block';
+        }
+
+        // Show basic query results
+        function showBasicQueryResults(data) {
+            // Remove existing card if any
+            const existingCard = document.getElementById('verification-result-card');
+            if (existingCard) {
+                existingCard.innerHTML = '';
+                existingCard.style.display = 'none';
+            }
+
+            const cardHtml = `
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-search me-2"></i>
+                                    Basic Result
+                                </h5>
+                                <button type="button" class="btn btn-sm btn-outline-light" onclick="hideVerificationCard()">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6 class="border-bottom pb-2 mb-3 text-dark">
+                                        <i class="fas fa-info-circle me-2"></i>Query Information
+                                    </h6>
+                                    <div class="info-row">
+                                        <strong>Phone Number:</strong>
+                                        <span>${data.phone_number}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Supported:</strong>
+                                        <span>${data.supported ? 'Yes' : 'No'}</span>
+                                    </div>
+                                    ${data.coverage_info && data.coverage_info.country ? `
+                                    <div class="info-row">
+                                        <strong>Country:</strong>
+                                        <span>${data.coverage_info.country}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.coverage_info && data.coverage_info.country_code ? `
+                                    <div class="info-row">
+                                        <strong>Dialing Code:</strong>
+                                        <span>+${data.coverage_info.country_code}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.coverage_info && (data.coverage_info.network_name || data.coverage_info.carrier_name) ? `
+                                    <div class="info-row">
+                                        <strong>Network/Carrier:</strong>
+                                        <span>${data.coverage_info.network_name || data.coverage_info.carrier_name}</span>
+                                    </div>
+                                    ` : ''}
+                                    ${data.coverage_info && (data.coverage_info.live_coverage !== undefined || data.coverage_info.support_provider !== undefined) ? `
+                                    <div class="info-row">
+                                        <strong>Status:</strong>
+                                        <span>${(data.coverage_info.live_coverage || data.coverage_info.support_provider) ? 'Active' : 'Inactive'}</span>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            <div class="mt-3 pt-3 border-top">
+                                <div class="alert alert-info mb-0">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Note:</strong> ${data.note}
+                                    ${!data.supported ? '' : ' To get detailed verification data, use the ADVANCED query option.'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>
+                    .info-row {
+                        margin-bottom: 8px;
+                        padding: 4px 0;
+                    }
+                    .info-row strong {
+                        display: inline-block;
+                        min-width: 120px;
+                        color: #495057;
+                    }
+                    </style>
+                `;
+
+            existingCard.innerHTML = cardHtml;
+            existingCard.style.display = 'block';
+
+            // Scroll to the card
+            existingCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         // Show verification result card
@@ -420,203 +736,203 @@
 
             // Create card HTML with simplified black and primary colors only
             const cardHtml = `
-                <div class="card border-0 shadow-sm">
-                    <div class="card-header text-white">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <h5 class="card-title mb-0">
-                                <i class="fas fa-phone-alt me-2"></i>
-                                Phone Verification Results
-                            </h5>
-                            <button type="button" class="btn btn-sm btn-outline-light" onclick="hideVerificationCard()">
-                                <i class="fas fa-times"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <!-- Basic Information -->
-                            <div class="col-md-6 mb-4">
-                                <h6 class="border-bottom pb-2 mb-3 text-dark">
-                                    <i class="fas fa-info-circle me-2"></i>Basic Information
-                                </h6>
-                                <div class="info-row">
-                                    <strong>Phone Number:</strong>
-                                    <span class="badge bg-dark text-white">${data.number}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Local Format:</strong>
-                                    <span>${data.local_format || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Valid:</strong>
-                                    <span>${data.valid || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Present:</strong>
-                                    <span class="badge ${data.present === 'yes' ? 'bg-primary' : 'bg-dark'} text-white">
-                                        ${data.present || 'NULL'}
-                                    </span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Status:</strong>
-                                    <span class="badge ${data.status === 0 ? 'bg-primary' : 'bg-dark'} text-white">
-                                        ${data.status_message || 'NULL'}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <!-- Security Information -->
-                            <div class="col-md-6 mb-4">
-                                <h6 class="border-bottom pb-2 mb-3 text-dark">
-                                    <i class="fas fa-shield-alt me-2"></i>Security Information
-                                </h6>
-                                <div class="info-row">
-                                    <strong>Fraud Score:</strong>
-                                    <span>${data.fraud_score || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Recent Abuse:</strong>
-                                    <span>${data.recent_abuse || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>VoIP:</strong>
-                                    <span>${data.voip || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Prepaid:</strong>
-                                    <span>${data.prepaid || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Risky:</strong>
-                                    <span>${data.risky || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Leaked Online:</strong>
-                                    <span>${data.leaked_online || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Spammer:</strong>
-                                    <span>${data.spammer || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                            </div>
-
-                            <!-- Network Information -->
-                            <div class="col-md-6 mb-4">
-                                <h6 class="border-bottom pb-2 mb-3 text-dark">
-                                    <i class="fas fa-network-wired me-2"></i>Network Information
-                                </h6>
-                                <div class="info-row">
-                                    <strong>Network:</strong>
-                                    <span class="badge bg-primary text-white">${data.network || 'NULL'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Type:</strong>
-                                    <span class="badge bg-dark text-white">${data.type || 'NULL'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Prefix:</strong>
-                                    <span>${data.prefix || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>MCC/MNC:</strong>
-                                    <span>${data.mcc || 'NULL'}/${data.mnc || 'NULL'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Ported:</strong>
-                                    <span class="badge ${data.ported ? 'bg-dark' : 'bg-primary'} text-white">
-                                        ${data.ported ? 'Yes' : data.ported === false ? 'No' : 'NULL'}
-                                    </span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>CIC:</strong>
-                                    <span>${data.cic || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>IMSI:</strong>
-                                    <span>${data.imsi || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>OCN:</strong>
-                                    <span>${data.ocn || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                            </div>
-
-                            <!-- Location Information -->
-                            <div class="col-md-6 mb-4">
-                                <h6 class="border-bottom pb-2 mb-3 text-dark">
-                                    <i class="fas fa-map-marker-alt me-2"></i>Location Information
-                                </h6>
-                                <div class="info-row">
-                                    <strong>Country:</strong>
-                                    <span class="badge bg-primary text-white">${data.country || 'NULL'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>City:</strong>
-                                    <span>${data.city || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Region:</strong>
-                                    <span>${data.region || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>ZIP Code:</strong>
-                                    <span>${data.zip_code || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Timezone:</strong>
-                                    <span>${data.timezone || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                                <div class="info-row">
-                                    <strong>Dialing Code:</strong>
-                                    <span>${data.dialing_code || '<span class="text-muted">NULL</span>'}</span>
-                                </div>
-                            </div>
-
-                            <!-- Technical Details -->
-                            <div class="col-12">
-                                <h6 class="border-bottom pb-2 mb-3 text-dark">
-                                    <i class="fas fa-cogs me-2"></i>Technical Details
-                                </h6>
-                                <div class="row">
-                                    <div class="col-md-4">
-                                        <div class="info-row">
-                                            <strong>Error Code:</strong>
-                                            <span>${data.error || '<span class="text-muted">NULL</span>'}</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="info-row">
-                                            <strong>Transaction ID:</strong>
-                                            <span class="text-monospace">${data.trxid || '<span class="text-muted">NULL</span>'}</span>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <div class="info-row">
-                                            <strong>Verified At:</strong>
-                                            <span>${data.created_at ? new Date(data.created_at).toLocaleString() : '<span class="text-muted">NULL</span>'}</span>
-                                        </div>
-                                    </div>
-                                </div>
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header text-white">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="card-title mb-0">
+                                    <i class="fas fa-phone-alt me-2"></i>
+                                    Phone Verification Results
+                                </h5>
+                                <button type="button" class="btn btn-sm btn-outline-light" onclick="hideVerificationCard()">
+                                    <i class="fas fa-times"></i>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <!-- Basic Information -->
+                                <div class="col-md-6 mb-4">
+                                    <h6 class="border-bottom pb-2 mb-3 text-dark">
+                                        <i class="fas fa-info-circle me-2"></i>Basic Information
+                                    </h6>
+                                    <div class="info-row">
+                                        <strong>Phone Number:</strong>
+                                        <span class="badge bg-dark text-white">${data.number}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Local Format:</strong>
+                                        <span>${data.local_format || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Valid:</strong>
+                                        <span>${data.valid || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Present:</strong>
+                                        <span class="badge ${data.present === 'yes' ? 'bg-primary' : 'bg-dark'} text-white">
+                                            ${data.present || 'NULL'}
+                                        </span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Status:</strong>
+                                        <span class="badge ${data.status === 0 ? 'bg-primary' : 'bg-dark'} text-white">
+                                            ${data.status_message || 'NULL'}
+                                        </span>
+                                    </div>
+                                </div>
 
-                <style>
-                .info-row {
-                    margin-bottom: 8px;
-                    padding: 4px 0;
-                }
-                .info-row strong {
-                    display: inline-block;
-                    min-width: 120px;
-                    color: #495057;
-                }
-                .text-muted {
-                    font-style: italic;
-                }
-                </style>
-            `;
+                                <!-- Security Information -->
+                                <div class="col-md-6 mb-4">
+                                    <h6 class="border-bottom pb-2 mb-3 text-dark">
+                                        <i class="fas fa-shield-alt me-2"></i>Security Information
+                                    </h6>
+                                    <div class="info-row">
+                                        <strong>Fraud Score:</strong>
+                                        <span>${data.fraud_score || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Recent Abuse:</strong>
+                                        <span>${data.recent_abuse || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>VoIP:</strong>
+                                        <span>${data.voip || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Prepaid:</strong>
+                                        <span>${data.prepaid || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Risky:</strong>
+                                        <span>${data.risky || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Leaked Online:</strong>
+                                        <span>${data.leaked_online || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Spammer:</strong>
+                                        <span>${data.spammer || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Network Information -->
+                                <div class="col-md-6 mb-4">
+                                    <h6 class="border-bottom pb-2 mb-3 text-dark">
+                                        <i class="fas fa-network-wired me-2"></i>Network Information
+                                    </h6>
+                                    <div class="info-row">
+                                        <strong>Network:</strong>
+                                        <span class="badge bg-primary text-white">${data.network || 'NULL'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Type:</strong>
+                                        <span class="badge bg-dark text-white">${data.type || 'NULL'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Prefix:</strong>
+                                        <span>${data.prefix || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>MCC/MNC:</strong>
+                                        <span>${data.mcc || 'NULL'}/${data.mnc || 'NULL'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Ported:</strong>
+                                        <span class="badge ${data.ported ? 'bg-dark' : 'bg-primary'} text-white">
+                                            ${data.ported ? 'Yes' : data.ported === false ? 'No' : 'NULL'}
+                                        </span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>CIC:</strong>
+                                        <span>${data.cic || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>IMSI:</strong>
+                                        <span>${data.imsi || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>OCN:</strong>
+                                        <span>${data.ocn || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Location Information -->
+                                <div class="col-md-6 mb-4">
+                                    <h6 class="border-bottom pb-2 mb-3 text-dark">
+                                        <i class="fas fa-map-marker-alt me-2"></i>Location Information
+                                    </h6>
+                                    <div class="info-row">
+                                        <strong>Country:</strong>
+                                        <span class="badge bg-primary text-white">${data.country || 'NULL'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>City:</strong>
+                                        <span>${data.city || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Region:</strong>
+                                        <span>${data.region || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>ZIP Code:</strong>
+                                        <span>${data.zip_code || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Timezone:</strong>
+                                        <span>${data.timezone || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                    <div class="info-row">
+                                        <strong>Dialing Code:</strong>
+                                        <span>${data.dialing_code || '<span class="text-muted">NULL</span>'}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Technical Details -->
+                                <div class="col-12">
+                                    <h6 class="border-bottom pb-2 mb-3 text-dark">
+                                        <i class="fas fa-cogs me-2"></i>Technical Details
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="info-row">
+                                                <strong>Error Code:</strong>
+                                                <span>${data.error || '<span class="text-muted">NULL</span>'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="info-row">
+                                                <strong>Transaction ID:</strong>
+                                                <span class="text-monospace">${data.trxid || '<span class="text-muted">NULL</span>'}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="info-row">
+                                                <strong>Verified At:</strong>
+                                                <span>${data.created_at ? new Date(data.created_at).toLocaleString() : '<span class="text-muted">NULL</span>'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <style>
+                    .info-row {
+                        margin-bottom: 8px;
+                        padding: 4px 0;
+                    }
+                    .info-row strong {
+                        display: inline-block;
+                        min-width: 120px;
+                        color: #495057;
+                    }
+                    .text-muted {
+                        font-style: italic;
+                    }
+                    </style>
+                `;
 
             existingCard.innerHTML = cardHtml;
             existingCard.style.display = 'block';
@@ -754,7 +1070,7 @@
                 $(newNode).attr('title', 'Click to view detailed verification results');
 
                 // Add click handler to show card
-                $(newNode).on('click', function() {
+                $(newNode).on('click', function () {
                     showVerificationCard(verificationData);
                 });
 
@@ -772,7 +1088,7 @@
         function highlightRow(phoneNumber) {
             const table = $('#network_verification_table').DataTable();
 
-            table.rows().every(function(rowIdx, tableLoop, rowLoop) {
+            table.rows().every(function (rowIdx, tableLoop, rowLoop) {
                 const data = this.data();
                 if (data && data[0] === phoneNumber) {
                     const rowNode = this.node();
@@ -801,7 +1117,6 @@
                 console.log(`Loaded ${verifications.length} verifications from server data`);
             } else {
                 console.log('No verifications found in server data');
-                showAlert('info', 'No Data', 'No verification records found.');
             }
         }
 
@@ -820,7 +1135,7 @@
             table.clear();
 
             if (verifications && verifications.length > 0) {
-                verifications.forEach(function(verification) {
+                verifications.forEach(function (verification) {
                     // Provider badge
                     const provider = verification.provider || 'Unknown';
                     const providerClass = provider === 'TMT' ? 'primary' : provider === 'IPQS' ? 'info' : 'secondary';
@@ -910,7 +1225,7 @@
                     $(newNode).attr('title', 'Click to view detailed verification results');
 
                     // Add click handler to show card
-                    $(newNode).on('click', function() {
+                    $(newNode).on('click', function () {
                         showVerificationCard(verification);
                     });
                 });
@@ -923,29 +1238,61 @@
             table.draw();
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Load verifications from server-side data
             loadVerifications();
 
-            const verifyBtn = document.getElementById('verifyBtn');
-            const phoneInput = document.getElementById('phone_number');
-            const phoneError = document.getElementById('phone-error');
-            const spinner = verifyBtn.querySelector('.spinner-border');
-            const modal = document.getElementById('verify');
+            // Main form elements
+            const verifyBtnMain = document.getElementById('verifyBtnMain');
+            const phoneInputMain = document.getElementById('phone_number_main');
+            const phoneErrorMain = document.getElementById('phone-error-main');
+            const spinnerMain = verifyBtnMain.querySelector('.spinner-border');
+            const basicQueryRadioMain = document.getElementById('basic_query_main');
+            const advancedQueryRadioMain = document.getElementById('advanced_query_main');
+            const advancedOptionsMain = document.getElementById('advanced-options-main');
+            const verificationResultMain = document.getElementById('verification-result-main');
+
 
             let phoneValidationCache = {};
 
-            // Network prefix validation (new functionality)
-            async function validateNetworkPrefix(phoneNumber) {
-                const validationInfo = document.getElementById('phone-validation-info');
-                const validationAlert = document.getElementById('validation-alert');
-                const detectedInfo = document.getElementById('detected-info');
-                const coverageStatus = document.getElementById('coverage-status');
-                const recommendationText = document.getElementById('recommendation-text');
+            // Handle query type selection for main form
+            function updateQueryTypeDisplayMain() {
+                if (advancedQueryRadioMain.checked) {
+                    advancedOptionsMain.style.display = 'block';
+                } else {
+                    advancedOptionsMain.style.display = 'none';
+                }
+
+                // Re-validate phone number when query type changes to update cost display
+                const phoneNumber = phoneInputMain.value.trim();
+                if (phoneNumber && phoneNumber.length >= 5) {
+                    // Force re-validation to update cost display for advanced queries
+                    clearTimeout(phoneInputMain.validationTimeout);
+                    phoneInputMain.validationTimeout = setTimeout(() => {
+                        validateNetworkPrefixMain(phoneNumber);
+                    }, 100);
+                }
+            }
+
+            // Event listeners for main form
+            basicQueryRadioMain.addEventListener('change', updateQueryTypeDisplayMain);
+            advancedQueryRadioMain.addEventListener('change', updateQueryTypeDisplayMain);
+
+            // Initialize display
+            updateQueryTypeDisplayMain();
+
+            // Real-time phone validation for main form
+
+            async function validateNetworkPrefixMain(phoneNumber) {
+                const validationInfo = document.getElementById('phone-validation-info-main');
+                const validationAlert = document.getElementById('validation-alert-main');
+                const detectedInfo = document.getElementById('detected-info-main');
+                const coverageStatus = document.getElementById('coverage-status-main');
+                const costInfo = document.getElementById('cost-info-main');
+                const costAmount = document.getElementById('cost-amount-main');
 
                 if (!phoneNumber || phoneNumber.length < 1) {
                     validationInfo.style.display = 'none';
-                    phoneInput.classList.remove('is-valid', 'is-invalid');
                     return null;
                 }
 
@@ -953,14 +1300,13 @@
 
                 if (cleanNumber.length === 0) {
                     validationInfo.style.display = 'none';
-                    phoneInput.classList.remove('is-valid', 'is-invalid');
                     return null;
                 }
 
                 // Check cache first
                 if (phoneValidationCache[cleanNumber]) {
                     const cachedResult = phoneValidationCache[cleanNumber];
-                    displayNetworkValidationResult(cachedResult);
+                    displayNetworkValidationResultMain(cachedResult);
                     return cachedResult;
                 }
 
@@ -979,7 +1325,7 @@
 
                     const result = await response.json();
                     phoneValidationCache[cleanNumber] = result;
-                    displayNetworkValidationResult(result);
+                    displayNetworkValidationResultMain(result);
                     return result;
                 } catch (error) {
                     console.error('Network prefix validation error:', error);
@@ -988,31 +1334,49 @@
                 }
             }
 
-            function displayNetworkValidationResult(result) {
-                const validationInfo = document.getElementById('phone-validation-info');
-                const validationAlert = document.getElementById('validation-alert');
-                const detectedInfo = document.getElementById('detected-info');
-                const coverageStatus = document.getElementById('coverage-status');
+            function displayNetworkValidationResultMain(result) {
+                const validationInfo = document.getElementById('phone-validation-info-main');
+                const validationAlert = document.getElementById('validation-alert-main');
+                const detectedInfo = document.getElementById('detected-info-main');
+                const coverageStatus = document.getElementById('coverage-status-main');
+                const costInfo = document.getElementById('cost-info-main');
+                const costAmount = document.getElementById('cost-amount-main');
+                const advancedQueryRadio = document.getElementById('advanced_query_main');
+                const phoneInput = phoneInputMain.value.trim();
+                const phoneLength = phoneInput.replace(/[^0-9]/g, '').length;
 
                 if (result.success) {
                     const countryName = result.country_name || 'Unknown';
                     const networkName = result.network_name || 'Unknown';
+                    const matchedPrefixLength = result.prefix_length || 0;
+
+                    // Progressive detection logic:
+                    // If user typed less than the matched prefix length, show ONLY country
+                    // If user typed equals or more than matched prefix, show country + network
+                    let displayText = '';
+
+                    if (phoneLength < matchedPrefixLength) {
+                        // User hasn't typed enough for operator - show only country
+                        displayText = countryName;
+                    } else {
+                        // User typed the full prefix - show country + operator
+                        displayText = `${countryName} - ${networkName} (${result.prefix})`;
+                    }
 
                     // Enhanced display for international scenarios
                     if (result.ambiguous) {
                         // Multiple countries possible - show helpful information
-                        const costInfo = result.cost ? ` - Cost: $${result.cost}` : '';
-                        detectedInfo.textContent = `${countryName} - ${networkName}${costInfo}`;
+                        detectedInfo.textContent = displayText;
                         coverageStatus.textContent = `Continue typing (${result.countries?.join(', ') || 'Multiple options'})`;
                         validationAlert.className = 'alert alert-warning mb-0';
 
-                        phoneInput.classList.remove('is-invalid', 'is-valid');
-                        phoneError.textContent = '';
-                        verifyBtn.disabled = true;
-                        verifyBtn.title = 'Continue typing to identify the country';
+                        phoneInputMain.classList.remove('is-invalid', 'is-valid');
+                        phoneErrorMain.textContent = '';
+                        phoneErrorMain.style.display = 'none';
+                        verifyBtnMain.disabled = true;
+                        verifyBtnMain.title = 'Continue typing to identify the country';
                     } else {
-                        const costInfo = result.cost ? ` - Cost: $${result.cost}` : '';
-                        detectedInfo.textContent = `${countryName} - ${networkName} (${result.prefix})${costInfo}`;
+                        detectedInfo.textContent = displayText;
 
                         // Handle partial matches (country code inputs) - show info without errors
                         if (result.partial_match) {
@@ -1020,32 +1384,48 @@
                             coverageStatus.textContent = result.live_coverage ? 'Available' : 'Not Available';
 
                             // Don't show input as invalid during typing - just neutral
-                            phoneInput.classList.remove('is-invalid', 'is-valid');
-                            phoneError.textContent = ''; // No error message during typing
+                            phoneInputMain.classList.remove('is-invalid', 'is-valid');
+                            phoneErrorMain.textContent = ''; // No error message during typing
+                            phoneErrorMain.style.display = 'none';
 
                             // Disable verify button for incomplete numbers (but don't show error)
-                            verifyBtn.disabled = true;
-                            verifyBtn.title = 'Complete the phone number to enable verification';
+                            verifyBtnMain.disabled = true;
+                            verifyBtnMain.title = 'Complete the phone number to enable verification';
                         } else if (result.live_coverage) {
-                            validationAlert.className = 'alert alert-success mb-0';
+                            validationAlert.className = 'p-2 border rounded';
                             coverageStatus.textContent = 'Available - API call will be made';
-                            phoneInput.classList.remove('is-invalid');
-                            phoneInput.classList.add('is-valid');
-                            phoneError.textContent = '';
+                            phoneInputMain.classList.remove('is-invalid');
+                            phoneInputMain.classList.add('is-valid');
+                            phoneErrorMain.textContent = '';
+                            phoneErrorMain.style.display = 'none';
 
                             // Enable verify button for complete valid numbers
-                            verifyBtn.disabled = false;
-                            verifyBtn.title = '';
+                            verifyBtnMain.disabled = false;
+                            verifyBtnMain.title = '';
                         } else {
                             validationAlert.className = 'alert alert-warning mb-0';
                             coverageStatus.textContent = 'Not Available - Verification disabled';
-                            phoneInput.classList.remove('is-invalid');
-                            phoneInput.classList.add('is-valid');
-                            phoneError.textContent = '';
+                            phoneInputMain.classList.remove('is-invalid');
+                            phoneInputMain.classList.add('is-valid');
+                            phoneErrorMain.textContent = '';
+                            phoneErrorMain.style.display = 'none';
 
-                            // Disable verify button for no coverage numbers
-                            verifyBtn.disabled = true;
-                            verifyBtn.title = 'This operator does not support live coverage verification';
+                            // For basic queries, still allow verification even without live coverage
+                            if (basicQueryRadioMain.checked) {
+                                verifyBtnMain.disabled = false;
+                                verifyBtnMain.title = '';
+                            } else {
+                                verifyBtnMain.disabled = true;
+                                verifyBtnMain.title = 'This operator does not support live coverage verification';
+                            }
+                        }
+
+                        // Show cost information for advanced queries
+                        if (result.cost && advancedQueryRadio.checked) {
+                            costAmount.textContent = `$${result.cost}`;
+                            costInfo.style.display = 'block';
+                        } else {
+                            costInfo.style.display = 'none';
                         }
                     }
 
@@ -1055,165 +1435,168 @@
                     detectedInfo.textContent = 'Network prefix not found in database';
                     coverageStatus.textContent = 'Unknown';
                     validationInfo.style.display = 'block';
-                    phoneInput.classList.remove('is-valid');
-                    phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = result.error || 'Network prefix not found';
+                    phoneInputMain.classList.remove('is-valid');
+                    phoneInputMain.classList.add('is-invalid');
+                    phoneErrorMain.textContent = result.error || 'Network prefix not found';
+                    phoneErrorMain.style.display = 'block';
+                    costInfo.style.display = 'none';
 
                     // Disable verify button for invalid numbers
-                    verifyBtn.disabled = true;
-                    verifyBtn.title = 'Enter a valid phone number to enable verification';
+                    verifyBtnMain.disabled = true;
+                    verifyBtnMain.title = 'Enter a valid phone number to enable verification';
                 }
             }
 
-            // Add real-time validation to phone input
-            phoneInput.addEventListener('input', function(e) {
-                phoneError.textContent = '';
+            // MAIN FORM HANDLERS
+            // Add real-time validation to main phone input
+            phoneInputMain.addEventListener('input', function (e) {
+                phoneErrorMain.textContent = '';
+                phoneErrorMain.style.display = 'none';
+                const phoneNumber = e.target.value.trim();
 
-                // Disable verify button immediately when user starts typing
-                verifyBtn.disabled = true;
-                verifyBtn.title = 'Validating phone number...';
+                // Start progressive detection at 1 digit to catch all country codes
+                // Country codes can be 1-4 digits (e.g., 1=USA/Canada, 39=Italy, 971=UAE)
+                // Prefixes can be 8-10 digits
+                if (phoneNumber.length < 1) {
+                    document.getElementById('phone-validation-info-main').style.display = 'none';
+                    verifyBtnMain.disabled = true;
+                    verifyBtnMain.title = 'Enter phone number';
+                    phoneInputMain.classList.remove('is-valid', 'is-invalid');
+                    return;
+                }
 
-                clearTimeout(phoneInput.validationTimeout);
-                phoneInput.validationTimeout = setTimeout(() => {
-                    validateNetworkPrefix(e.target.value);
-                }, 500);
+                // For basic queries, use simple validation but still show network info
+                if (basicQueryRadioMain.checked) {
+                    if (phoneNumber.length >= 8) {
+                        verifyBtnMain.disabled = false;
+                        verifyBtnMain.title = '';
+                        phoneInputMain.classList.remove('is-invalid');
+                        phoneInputMain.classList.add('is-valid');
+                    } else {
+                        verifyBtnMain.disabled = true;
+                        verifyBtnMain.title = 'Enter at least 8 digits';
+                        phoneInputMain.classList.remove('is-valid', 'is-invalid');
+                    }
+
+                    // Show network info even for basic queries with faster response
+                    clearTimeout(phoneInputMain.validationTimeout);
+                    phoneInputMain.validationTimeout = setTimeout(() => {
+                        validateNetworkPrefixMain(phoneNumber);
+                    }, 300);
+                    return;
+                }
+
+                // For advanced queries, use full validation
+                verifyBtnMain.disabled = true;
+                verifyBtnMain.title = 'Validating phone number...';
+
+                clearTimeout(phoneInputMain.validationTimeout);
+                phoneInputMain.validationTimeout = setTimeout(() => {
+                    validateNetworkPrefixMain(phoneNumber);
+                }, 300);
             });
 
-            // Initial state - disable verify button when modal opens
-            verifyBtn.disabled = true;
-            verifyBtn.title = 'Enter a phone number to enable verification';
-
-            verifyBtn.addEventListener('click', async function() {
-                const phoneNumber = phoneInput.value.trim();
-                const dataFreshness = document.getElementById('data_freshness').value;
+            // Main verify button handler
+            verifyBtnMain.addEventListener('click', async function () {
+                const phoneNumber = phoneInputMain.value.trim();
+                const queryType = document.querySelector('input[name="query_type_main"]:checked').value;
+                const dataFreshness = document.getElementById('data_freshness_main').value;
 
                 if (!phoneNumber) {
-                    phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = 'Please enter a phone number';
+                    phoneInputMain.classList.add('is-invalid');
+                    phoneErrorMain.textContent = 'Please enter a phone number';
+                    phoneErrorMain.style.display = 'block';
                     return;
                 }
 
-                phoneInput.classList.remove('is-invalid');
-                phoneError.textContent = '';
+                phoneInputMain.classList.remove('is-invalid');
+                phoneErrorMain.textContent = '';
+                phoneErrorMain.style.display = 'none';
 
-                verifyBtn.disabled = true;
-                spinner.classList.remove('d-none');
-                verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Validating...';
+                verifyBtnMain.disabled = true;
+                spinnerMain.classList.remove('d-none');
+                verifyBtnMain.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                // Validate network prefix first
-                const validationResult = await validateNetworkPrefix(phoneNumber);
+                try {
+                    if (queryType === 'basic') {
+                        // Basic query
+                        const response = await fetch('/verification/basic', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            },
+                            body: JSON.stringify({
+                                phone_number: phoneNumber
+                            })
+                        });
 
-                if (!validationResult || !validationResult.success) {
-                    phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = validationResult?.error || 'Network prefix not found';
-                    showAlert('danger', 'Validation Failed', validationResult?.error || 'Network prefix not found in database.');
-
-                    verifyBtn.disabled = true; // Keep disabled for invalid numbers
-                    spinner.classList.add('d-none');
-                    verifyBtn.innerHTML = 'Verify';
-                    return;
-                }
-
-                // Check if number is incomplete (partial match)
-                if (validationResult.partial_match) {
-                    phoneInput.classList.add('is-invalid');
-                    phoneError.textContent = `Phone number is incomplete. Please enter ${validationResult.min_length}-${validationResult.max_length} digits.`;
-                    showAlert('warning', 'Incomplete Number', `Please enter the complete phone number (${validationResult.min_length}-${validationResult.max_length} digits) before verification.`);
-
-                    verifyBtn.disabled = true; // Keep disabled for incomplete numbers
-                    spinner.classList.add('d-none');
-                    verifyBtn.innerHTML = 'Verify';
-                    return;
-                }
-
-
-                verifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
-
-                // Make API call to web verification route
-                fetch('/verification/verify', {
-                        method: 'POST',
-                        headers: API_CONFIG.headers,
-                        body: JSON.stringify({
-                            phone_number: phoneNumber,
-                            data_freshness: dataFreshness
-                        })
-                    })
-                    .then(response => {
-                        console.log('Raw response status:', response.status);
-                        console.log('Raw response ok:', response.ok);
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log('Parsed response data:', data);
+                        const data = await response.json();
                         if (data.success) {
-                            $(modal).modal('hide');
-
-                            // Show verification result card for all successful verifications
-                            showVerificationCard(data.data);
-
-                            // Handle different sources from our API
-                            if (data.source === 'cache') {
-                                showAlert('info', 'Cache Hit', 'Phone number verification retrieved from cache.');
-                                highlightRow(data.data.number);
-                            } else if (data.source === 'database') {
-                                showAlert('info', 'Database Hit', 'Phone number verification retrieved from database.');
-                                highlightRow(data.data.number);
-                            } else if (data.source === 'tmt_api') {
-                                showAlert('success', 'TMT API Call', 'Phone number verified with fresh TMT API call.');
-                                updateTableRow(data.data);
-                            } else {
-                                // Fallback for any other cases
-                                showAlert('success', 'Verification Complete', 'Phone number verified successfully!');
-                                updateTableRow(data.data);
-                            }
-
-                            // For cache/database hits, we could optionally reload the page to get fresh server data
-                            // if (data.source === 'cache' || data.source === 'database') {
-                            //     window.location.reload();
-                            // }
+                            showBasicQueryResultsMain(data);
                         } else {
-                            phoneInput.classList.add('is-invalid');
-                            phoneError.textContent = data.message || 'Verification failed';
-                            showAlert('danger', 'Error', data.message || 'Phone number verification failed.');
+                            phoneInputMain.classList.add('is-invalid');
+                            phoneErrorMain.textContent = data.message || 'Basic query failed';
+                            phoneErrorMain.style.display = 'block';
                         }
-                    })
-                    .catch(error => {
-                        console.error('Detailed error information:', error);
-                        console.error('Error message:', error.message);
-                        console.error('Error stack:', error.stack);
-                        phoneInput.classList.add('is-invalid');
-                        phoneError.textContent = 'Network error. Please try again.';
-                        showAlert('danger', 'Error', 'Network error occurred. Please try again. Check console for details.');
-                    })
-                    .finally(() => {
-                        verifyBtn.disabled = false;
-                        spinner.classList.add('d-none');
-                        verifyBtn.innerHTML = 'Verify';
-                    });
+                    } else {
+                        // Advanced query
+                        const requestBody = {
+                            phone_number: phoneNumber
+                        };
+
+                        // Handle data freshness options
+                        if (dataFreshness === 'all') {
+                            requestBody.force_reverify = true;
+                        } else if (dataFreshness === '30' || dataFreshness === '60' || dataFreshness === '90') {
+                            // Pass data freshness for age-based refresh
+                            requestBody.data_freshness = dataFreshness;
+                        }
+
+                        const response = await fetch('/verification/advanced', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            },
+                            body: JSON.stringify(requestBody)
+                        });
+
+                        const data = await response.json();
+                        if (data.success) {
+                            showVerificationCardMain(data.verification || data.data);
+                            // Don't show table for single verification
+                            // updateTableRow(data.verification);
+                        } else {
+                            phoneInputMain.classList.add('is-invalid');
+                            phoneErrorMain.textContent = data.message || 'Advanced verification failed';
+                            phoneErrorMain.style.display = 'block';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error:', error);
+                    phoneInputMain.classList.add('is-invalid');
+                    phoneErrorMain.textContent = 'Network error. Please try again.';
+                    phoneErrorMain.style.display = 'block';
+                } finally {
+                    verifyBtnMain.disabled = false;
+                    spinnerMain.classList.add('d-none');
+                    verifyBtnMain.innerHTML = 'Verify';
+                }
             });
 
-            // Modal reset functionality
-            $(modal).on('hidden.bs.modal', function() {
-                phoneInput.value = '';
-                document.getElementById('data_freshness').value = '';
-                phoneInput.classList.remove('is-invalid', 'is-valid');
-                phoneError.textContent = '';
-                document.getElementById('phone-validation-info').style.display = 'none';
-                verifyBtn.disabled = true; // Start with disabled button
-                verifyBtn.title = 'Enter a phone number to enable verification';
-                spinner.classList.add('d-none');
-                verifyBtn.innerHTML = 'Verify';
-            });
-
-            phoneInput.addEventListener('keypress', function(e) {
+            phoneInputMain.addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    verifyBtn.click();
+                    verifyBtnMain.click();
                 }
             });
+
+            // Initial state for main form
+            verifyBtnMain.disabled = true;
+            verifyBtnMain.title = 'Enter a phone number to enable verification';
 
             // Batch verification functionality (copied and adapted)
             const batchVerifyBtn = document.getElementById('batchVerifyBtn');
@@ -1226,12 +1609,12 @@
             let extractedPhoneNumbers = [];
 
             // File upload handlers and batch processing (same as original)
-            fileUpload.addEventListener('change', function(e) {
+            fileUpload.addEventListener('change', function (e) {
                 const file = e.target.files[0];
                 if (!file) return;
 
                 const reader = new FileReader();
-                reader.onload = function(event) {
+                reader.onload = function (event) {
                     try {
                         if (file.name.endsWith('.csv')) {
                             extractedPhoneNumbers = parseCSV(event.target.result);
@@ -1269,10 +1652,10 @@
             }
 
             function parseExcel(arrayBuffer) {
-                const workbook = XLSX.read(arrayBuffer, {type: 'array'});
+                const workbook = XLSX.read(arrayBuffer, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 const phoneNumbers = [];
 
                 for (let row of jsonData) {
@@ -1287,7 +1670,7 @@
                 return phoneNumbers;
             }
 
-            function showPreview(phoneNumbers) {
+            async function showPreview(phoneNumbers) {
                 if (phoneNumbers.length === 0) {
                     fileUpload.classList.add('is-invalid');
                     batchError.textContent = 'No valid phone numbers found in file';
@@ -1297,9 +1680,41 @@
 
                 fileUpload.classList.remove('is-invalid');
                 batchError.textContent = '';
-                previewInfo.textContent = `Found ${phoneNumbers.length} phone numbers`;
+                previewInfo.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Analyzing ${phoneNumbers.length} phone numbers...`;
                 previewBody.innerHTML = '';
+                filePreview.style.display = 'block';
 
+                // Call cost preview API
+                try {
+                    const response = await fetch('/verification/batch/preview', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                        },
+                        body: JSON.stringify({
+                            phone_numbers: phoneNumbers
+                        })
+                    });
+
+                    const costData = await response.json();
+
+                    if (costData.success) {
+                        showCostBreakdown(costData);
+                    } else {
+                        previewInfo.textContent = `Found ${phoneNumbers.length} phone numbers`;
+                        showSimplePreview(phoneNumbers);
+                    }
+                } catch (error) {
+                    console.error('Cost preview error:', error);
+                    previewInfo.textContent = `Found ${phoneNumbers.length} phone numbers`;
+                    showSimplePreview(phoneNumbers);
+                }
+            }
+
+            function showSimplePreview(phoneNumbers) {
+                previewBody.innerHTML = '';
                 phoneNumbers.slice(0, 10).forEach(phone => {
                     const row = document.createElement('tr');
                     row.innerHTML = `<td>${phone}</td>`;
@@ -1311,11 +1726,48 @@
                     row.innerHTML = `<td><em>... and ${phoneNumbers.length - 10} more</em></td>`;
                     previewBody.appendChild(row);
                 }
-
-                filePreview.style.display = 'block';
             }
 
-            batchVerifyBtn.addEventListener('click', function() {
+            function showCostBreakdown(costData) {
+                const totalCost = costData.total_cost;
+                const avgCost = costData.avg_cost_per_number;
+                const withCoverage = costData.numbers_with_coverage;
+                const withoutCoverage = costData.numbers_without_coverage;
+                const countries = costData.country_breakdown || [];
+
+                // Simple summary message
+                previewInfo.innerHTML = `
+                        Found <strong>${costData.total_numbers}</strong> phone numbers.
+                        Estimated cost: <strong>$${totalCost.toFixed(6)}</strong>
+                        (${withCoverage} with coverage${withoutCoverage > 0 ? `, ${withoutCoverage} will be skipped` : ''})
+                    `;
+
+                // Minimal table view
+                previewBody.innerHTML = `
+                        ${countries.map(country => `
+                            <tr>
+                                <td>
+                                    <strong>${country.country}</strong> (${country.count} numbers)
+                                </td>
+                                <td class="text-end">
+                                    <strong>$${country.total_cost.toFixed(6)}</strong>
+                                </td>
+                            </tr>
+                        `).join('')}
+                        ${withoutCoverage > 0 ? `
+                            <tr>
+                                <td colspan="2">
+                                    <small class="text-muted">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        ${withoutCoverage} numbers without coverage will be skipped
+                                    </small>
+                                </td>
+                            </tr>
+                        ` : ''}
+                    `;
+            }
+
+            batchVerifyBtn.addEventListener('click', function () {
                 if (extractedPhoneNumbers.length === 0) {
                     fileUpload.classList.add('is-invalid');
                     batchError.textContent = 'Please upload a file with phone numbers';
@@ -1330,21 +1782,42 @@
                 batchSpinner.classList.remove('d-none');
                 batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Verifying...';
 
-                fetch('{{ route("verification.batch") }}', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
-                        },
-                        body: JSON.stringify({
-                            phone_numbers: extractedPhoneNumbers,
-                            data_freshness: document.getElementById('batch_data_freshness').value
-                        })
+                fetch('/verification/batch', {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({
+                        phone_numbers: extractedPhoneNumbers,
+                        data_freshness: document.getElementById('batch_data_freshness').value
                     })
-                    .then(response => response.json())
+                })
+                    .then(response => {
+                        console.log('Response status:', response.status);
+                        console.log('Response headers:', response.headers);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.text();
+                    })
+                    .then(text => {
+                        console.log('Raw response:', text.substring(0, 200));
+                        try {
+                            return JSON.parse(text);
+                        } catch (e) {
+                            console.error('Failed to parse JSON:', e);
+                            console.error('Response text:', text);
+                            throw new Error('Invalid JSON response from server');
+                        }
+                    })
                     .then(data => {
                         if (data.success) {
                             $(batchModal).modal('hide');
+
+                            // Show the verification table
+                            document.getElementById('verification-table-container').style.display = 'block';
 
                             // Create Apple-style results display
                             showBatchResults(data);
@@ -1372,12 +1845,15 @@
                     })
                     .finally(() => {
                         batchVerifyBtn.disabled = false;
-                        batchSpinner.classList.add('d-none');
-                        batchVerifyBtn.innerHTML = 'Verify All';
+                        const spinner = batchVerifyBtn.querySelector('.spinner-border');
+                        if (spinner) {
+                            spinner.classList.add('d-none');
+                        }
+                        batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm d-none" role="status"></span> Verify All';
                     });
             });
 
-            $(batchModal).on('hidden.bs.modal', function() {
+            $(batchModal).on('hidden.bs.modal', function () {
                 fileUpload.value = '';
                 document.getElementById('batch_data_freshness').value = '';
                 fileUpload.classList.remove('is-invalid');
@@ -1385,16 +1861,19 @@
                 filePreview.style.display = 'none';
                 extractedPhoneNumbers = [];
                 batchVerifyBtn.disabled = false;
-                const batchSpinner = batchVerifyBtn.querySelector('.spinner-border');
-                batchSpinner.classList.add('d-none');
-                batchVerifyBtn.innerHTML = 'Verify All';
+                const spinner = batchVerifyBtn.querySelector('.spinner-border');
+                if (spinner) {
+                    spinner.classList.add('d-none');
+                }
+                batchVerifyBtn.innerHTML = '<span class="spinner-border spinner-border-sm d-none" role="status"></span> Verify All';
             });
         });
     </script>
 @endsection
 
 <!-- Filter Modal - YouTube Style -->
-<div class="modal fade" id="filterModal" tabindex="-1" role="dialog" aria-labelledby="filterModalLabel" aria-hidden="true">
+<div class="modal fade" id="filterModal" tabindex="-1" role="dialog" aria-labelledby="filterModalLabel"
+    aria-hidden="true">
     <div class="modal-dialog modal-md" role="document">
         <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 4px 24px rgba(0,0,0,0.15);">
             <div class="modal-header border-0 px-4 pt-4 pb-2">
@@ -1406,11 +1885,13 @@
                 <div id="modal-filters">
                     <!-- Coverage Category -->
                     <div class="filter-category mb-4">
-                        <h6 class="filter-category-title" style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <h6 class="filter-category-title"
+                            style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
                             Coverage
                         </h6>
                         <div class="filter-options">
-                            <select id="modal-coverage-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                            <select id="modal-coverage-filter" class="form-select"
+                                style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
                                 <option value="">All Coverage Types</option>
                                 <option value="Yes">Live Coverage</option>
                                 <option value="No">No Coverage</option>
@@ -1420,12 +1901,14 @@
 
                     <!-- Connection Category -->
                     <div class="filter-category mb-4">
-                        <h6 class="filter-category-title" style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <h6 class="filter-category-title"
+                            style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
                             Connection
                         </h6>
                         <div class="row">
                             <div class="col-6">
-                                <select id="modal-type-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                <select id="modal-type-filter" class="form-select"
+                                    style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
                                     <option value="">All Types</option>
                                     <option value="Mobile">Mobile</option>
                                     <option value="Fixed">Fixed</option>
@@ -1433,7 +1916,8 @@
                                 </select>
                             </div>
                             <div class="col-6">
-                                <select id="modal-ported-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                <select id="modal-ported-filter" class="form-select"
+                                    style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
                                     <option value="">All Porting</option>
                                     <option value="Yes">Ported</option>
                                     <option value="No">Not Ported</option>
@@ -1444,12 +1928,14 @@
 
                     <!-- Status Category -->
                     <div class="filter-category mb-4">
-                        <h6 class="filter-category-title" style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <h6 class="filter-category-title"
+                            style="font-size: 14px; font-weight: 600; color: #666; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
                             Status
                         </h6>
                         <div class="row">
                             <div class="col-6">
-                                <select id="modal-status-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                <select id="modal-status-filter" class="form-select"
+                                    style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
                                     <option value="">All Status</option>
                                     <option value="Success">Success</option>
                                     <option value="Failed">Failed</option>
@@ -1458,7 +1944,8 @@
                                 </select>
                             </div>
                             <div class="col-6">
-                                <select id="modal-present-filter" class="form-select" style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
+                                <select id="modal-present-filter" class="form-select"
+                                    style="border: 1px solid #e0e0e0; border-radius: 8px; padding: 8px 12px; font-size: 14px;">
                                     <option value="">All Presence</option>
                                     <option value="Yes">Present</option>
                                     <option value="No">Not Present</option>

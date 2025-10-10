@@ -27,21 +27,36 @@ class TmtCoverageSeeder extends Seeder
         $handle = fopen($csvFile, 'r');
         fgetcsv($handle); // Skip header row
 
-        $batchSize = 1000;
+        $batchSize = 100;
         $batch = [];
         $totalRows = 0;
 
         while (($row = fgetcsv($handle)) !== false) {
+            // Skip rows with empty or invalid prefix data
+            if (empty($row[7]) || strlen($row[7]) > 50) {
+                continue;
+            }
+
+            // Extract the first country code if multiple are provided
+            $countryCode = $row[6];
+            if (strpos($countryCode, ',') !== false) {
+                $codes = explode(',', $countryCode);
+                $countryCode = trim($codes[0]);
+            }
+
+            // Limit country_code length to prevent errors
+            $countryCode = substr($countryCode, 0, 10);
+
             $batch[] = [
-                'iso2' => $row[0],
-                'network_id' => $row[1],
-                'network_name' => $row[2],
-                'mcc' => $row[3],
-                'mnc' => $row[4],
-                'country_code' => $row[5],
-                'prefix' => $row[6],
-                'live_coverage' => strtoupper($row[7]) === 'TRUE',
-                'rate' => (float) $row[8],
+                'iso2' => $row[0],              // iso2
+                'network_id' => $row[1],        // network_id
+                'network_name' => $row[2],      // full_name
+                'mcc' => $row[3],               // mcc
+                'mnc' => $row[4],               // mnc
+                'country_code' => $countryCode, // cc (country calling code, cleaned)
+                'prefix' => substr($row[7], 0, 50), // CC+Prefix (full prefix, limited to 50 chars)
+                'live_coverage' => strtoupper($row[8]) === 'TRUE',  // live_coverage
+                'rate' => (float) $row[9],      // rates
                 'created_at' => now(),
                 'updated_at' => now(),
             ];

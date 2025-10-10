@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            ApiProviderSeeder::class,
             TmtCoverageSeeder::class,
             IpqsCoverageSeeder::class,
         ]);

@@ -176,9 +176,20 @@ Route::view('others/search-result', 'others.search-result')->name('search-result
 use App\Http\Controllers\PhoneVerificationController;
 
 Route::get('verification', [PhoneVerificationController::class, 'index'])->name('verification.index');
+
+// NEW QUERY TYPES
+Route::post('verification/basic', [PhoneVerificationController::class, 'basicQuery'])->name('verification.basic');
+Route::post('verification/advanced', [PhoneVerificationController::class, 'advancedVerify'])->name('verification.advanced');
+
+// BATCH OPERATIONS
+Route::post('verification/batch/preview', [PhoneVerificationController::class, 'previewBatchCost'])->name('verification.batch.preview');
+Route::post('verification/batch', [PhoneVerificationController::class, 'verifyBatch'])->name('verification.batch');
+
+// LEGACY ROUTES (deprecated but kept for compatibility)
 Route::post('verification/check', [PhoneVerificationController::class, 'checkNetworkPrefix'])->name('verification.check');
 Route::post('verification/verify', [PhoneVerificationController::class, 'verify'])->name('verification.verify');
-Route::post('verification/batch', [PhoneVerificationController::class, 'verifyBatch'])->name('verification.batch');
+
+// MANAGEMENT ROUTES
 Route::get('verification/export', [PhoneVerificationController::class, 'export'])->name('verification.export');
 Route::get('verification/{id}', [PhoneVerificationController::class, 'getVerification'])->name('verification.show');
 Route::get('verification/history', [PhoneVerificationController::class, 'history'])->name('verification.history');
